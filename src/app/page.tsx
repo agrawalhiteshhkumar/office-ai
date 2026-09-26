@@ -9,6 +9,7 @@ import {
 } from "@/data/officeData";
 import { INITIAL_REGISTERS, InwardOutwardRecord } from "@/data/registerData";
 import RegisterModal from "@/components/RegisterModal";
+import AIIntelligenceModal from "@/components/AIIntelligenceModal";
 import { 
   Building2, 
   ShieldCheck, 
@@ -16,10 +17,11 @@ import {
   Layers, 
   History, 
   CheckCircle2, 
-  Sparkles,
-  ChevronRight,
-  ExternalLink,
-  BookOpen
+  Sparkles, 
+  ChevronRight, 
+  ExternalLink, 
+  BookOpen, 
+  Cpu 
 } from "lucide-react";
 
 export default function OfficeAIDashboard() {
@@ -27,7 +29,8 @@ export default function OfficeAIDashboard() {
   const [auditTrail, setAuditTrail] = useState<AuditRecord[]>([]);
   const [operatorName, setOperatorName] = useState("Administrative Officer");
   const [registers, setRegisters] = useState<InwardOutwardRecord[]>(INITIAL_REGISTERS);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isRegisterOpen, setIsRegisterOpen] = useState(false);
+  const [isAIOpen, setIsAIOpen] = useState(false);
 
   useEffect(() => {
     const initialLog: AuditRecord = {
@@ -58,8 +61,6 @@ export default function OfficeAIDashboard() {
 
   const handleAddRecord = (record: InwardOutwardRecord) => {
     setRegisters((prev) => [record, ...prev]);
-
-    // Append-only tamper-evident audit record
     const auditRecord: AuditRecord = {
       id: "LOG-" + Math.random().toString(36).substring(2, 9).toUpperCase(),
       timestamp: new Date().toLocaleTimeString(),
@@ -68,6 +69,19 @@ export default function OfficeAIDashboard() {
       action: record.type === "INWARD" ? "REGULATORY_INWARD_ENTRY" : "REGULATORY_OUTWARD_DISPATCH",
       details: `Logged ${record.referenceNumber} (${record.subject.substring(0, 35)}...)`,
       hash: "0x" + Math.random().toString(16).substring(2, 10) + "f41",
+    };
+    setAuditTrail((prev) => [auditRecord, ...prev.slice(0, 9)]);
+  };
+
+  const handleAIAuditLog = (action: string, details: string) => {
+    const auditRecord: AuditRecord = {
+      id: "LOG-" + Math.random().toString(36).substring(2, 9).toUpperCase(),
+      timestamp: new Date().toLocaleTimeString(),
+      sectionCode: activeSection.code,
+      actor: operatorName,
+      action: action,
+      details: details,
+      hash: "0x" + Math.random().toString(16).substring(2, 10) + "ae3",
     };
     setAuditTrail((prev) => [auditRecord, ...prev.slice(0, 9)]);
   };
@@ -95,10 +109,16 @@ export default function OfficeAIDashboard() {
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setIsModalOpen(true)}
-            className="px-3.5 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 text-amber-300 text-xs font-semibold flex items-center gap-2 transition"
+            onClick={() => setIsAIOpen(true)}
+            className="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-amber-500/20 to-amber-600/20 border border-amber-500/40 hover:bg-amber-500/30 text-amber-300 text-xs font-semibold flex items-center gap-2 transition shadow-sm"
           >
-            <BookOpen className="w-3.5 h-3.5" /> Central Inward/Outward Hub
+            <Cpu className="w-3.5 h-3.5" /> Statutory Circular AI
+          </button>
+          <button
+            onClick={() => setIsRegisterOpen(true)}
+            className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-2 transition"
+          >
+            <BookOpen className="w-3.5 h-3.5 text-amber-400" /> Central Despatch Hub
           </button>
           <div className="h-8 w-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-xs text-slate-300">
             AO
@@ -108,7 +128,7 @@ export default function OfficeAIDashboard() {
 
       {/* Main Workspace */}
       <div className="flex-1 flex flex-col lg:flex-row">
-        {/* Left Sidebar: Multi-Hat Desk Switcher */}
+        {/* Left Sidebar */}
         <aside className="w-full lg:w-80 border-r border-slate-800 bg-slate-900/40 p-5 flex flex-col gap-4">
           <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
@@ -156,7 +176,7 @@ export default function OfficeAIDashboard() {
           </div>
         </aside>
 
-        {/* Center Content */}
+        {/* Center Active Desk Operations */}
         <main className="flex-1 p-6 lg:p-8 flex flex-col gap-6 overflow-y-auto">
           {/* Active Desk Header Banner */}
           <div className="bg-gradient-to-r from-slate-900 to-slate-900/40 border border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
@@ -195,7 +215,7 @@ export default function OfficeAIDashboard() {
                     <h4 className="text-sm font-semibold text-slate-200 mt-1">{mandate}</h4>
                   </div>
                   <button 
-                    onClick={() => setIsModalOpen(true)}
+                    onClick={() => setIsRegisterOpen(true)}
                     className="text-xs text-amber-400 hover:text-amber-300 font-medium inline-flex items-center gap-1 self-start"
                   >
                     Launch Register <ExternalLink className="w-3 h-3" />
@@ -255,12 +275,19 @@ export default function OfficeAIDashboard() {
 
       {/* Central Inward / Outward Modal */}
       <RegisterModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        isOpen={isRegisterOpen}
+        onClose={() => setIsRegisterOpen(false)}
         sectionCode={activeSection.code}
         sectionName={activeSection.displayName}
         records={registers}
         onAddRecord={handleAddRecord}
+      />
+
+      {/* AI Circular Intelligence Modal */}
+      <AIIntelligenceModal
+        isOpen={isAIOpen}
+        onClose={() => setIsAIOpen(false)}
+        onLogAudit={handleAIAuditLog}
       />
     </div>
   );
