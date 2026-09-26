@@ -7,6 +7,8 @@ import {
   AdministrativeSection,
   AuditRecord 
 } from "@/data/officeData";
+import { INITIAL_REGISTERS, InwardOutwardRecord } from "@/data/registerData";
+import RegisterModal from "@/components/RegisterModal";
 import { 
   Building2, 
   ShieldCheck, 
@@ -16,15 +18,17 @@ import {
   CheckCircle2, 
   Sparkles,
   ChevronRight,
-  ExternalLink
+  ExternalLink,
+  BookOpen
 } from "lucide-react";
 
 export default function OfficeAIDashboard() {
   const [activeSection, setActiveSection] = useState<AdministrativeSection>(ADMINISTRATIVE_SECTIONS[0]);
   const [auditTrail, setAuditTrail] = useState<AuditRecord[]>([]);
   const [operatorName, setOperatorName] = useState("Administrative Officer");
+  const [registers, setRegisters] = useState<InwardOutwardRecord[]>(INITIAL_REGISTERS);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Load / initialize cryptographic audit trail in browser memory
   useEffect(() => {
     const initialLog: AuditRecord = {
       id: "LOG-" + Math.random().toString(36).substring(2, 9).toUpperCase(),
@@ -52,10 +56,26 @@ export default function OfficeAIDashboard() {
     setAuditTrail((prev) => [newEntry, ...prev.slice(0, 9)]);
   };
 
+  const handleAddRecord = (record: InwardOutwardRecord) => {
+    setRegisters((prev) => [record, ...prev]);
+
+    // Append-only tamper-evident audit record
+    const auditRecord: AuditRecord = {
+      id: "LOG-" + Math.random().toString(36).substring(2, 9).toUpperCase(),
+      timestamp: new Date().toLocaleTimeString(),
+      sectionCode: activeSection.code,
+      actor: operatorName,
+      action: record.type === "INWARD" ? "REGULATORY_INWARD_ENTRY" : "REGULATORY_OUTWARD_DISPATCH",
+      details: `Logged ${record.referenceNumber} (${record.subject.substring(0, 35)}...)`,
+      hash: "0x" + Math.random().toString(16).substring(2, 10) + "f41",
+    };
+    setAuditTrail((prev) => [auditRecord, ...prev.slice(0, 9)]);
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
       {/* Top Institutional Header */}
-      <header className="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-50 px-6 py-3.5 flex flex-wrap items-center justify-between gap-4">
+      <header className="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-40 px-6 py-3.5 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
             <Building2 className="w-5 h-5" />
@@ -73,13 +93,13 @@ export default function OfficeAIDashboard() {
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="text-right hidden sm:block">
-            <div className="text-xs font-medium text-slate-200">{operatorName}</div>
-            <div className="text-[11px] text-amber-400/90 flex items-center gap-1 justify-end">
-              <ShieldCheck className="w-3 h-3" /> Capacity: {activeSection.deskTitle.split("/")[0]}
-            </div>
-          </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="px-3.5 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 text-amber-300 text-xs font-semibold flex items-center gap-2 transition"
+          >
+            <BookOpen className="w-3.5 h-3.5" /> Central Inward/Outward Hub
+          </button>
           <div className="h-8 w-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-xs text-slate-300">
             AO
           </div>
@@ -124,7 +144,6 @@ export default function OfficeAIDashboard() {
             })}
           </div>
 
-          {/* Quick Regulatory Verification Badge */}
           <div className="mt-auto pt-4 border-t border-slate-800 text-xs text-slate-400 flex flex-col gap-2">
             <div className="text-[11px] font-semibold text-slate-300">Regulatory Frameworks</div>
             <div className="flex flex-wrap gap-1.5">
@@ -137,7 +156,7 @@ export default function OfficeAIDashboard() {
           </div>
         </aside>
 
-        {/* Center / Right Content: Active Desk Operations */}
+        {/* Center Content */}
         <main className="flex-1 p-6 lg:p-8 flex flex-col gap-6 overflow-y-auto">
           {/* Active Desk Header Banner */}
           <div className="bg-gradient-to-r from-slate-900 to-slate-900/40 border border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
@@ -160,7 +179,7 @@ export default function OfficeAIDashboard() {
             </div>
           </div>
 
-          {/* Primary Desk Mandates / Operations Grid */}
+          {/* Primary Desk Mandates */}
           <div>
             <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
               <FileText className="w-4 h-4 text-amber-400" /> Operational Mandates & Workflows
@@ -175,7 +194,10 @@ export default function OfficeAIDashboard() {
                     <span className="text-[10px] font-mono font-bold text-slate-500 uppercase">MANDATE 0{idx + 1}</span>
                     <h4 className="text-sm font-semibold text-slate-200 mt-1">{mandate}</h4>
                   </div>
-                  <button className="text-xs text-amber-400 hover:text-amber-300 font-medium inline-flex items-center gap-1 self-start">
+                  <button 
+                    onClick={() => setIsModalOpen(true)}
+                    className="text-xs text-amber-400 hover:text-amber-300 font-medium inline-flex items-center gap-1 self-start"
+                  >
                     Launch Register <ExternalLink className="w-3 h-3" />
                   </button>
                 </div>
@@ -183,7 +205,7 @@ export default function OfficeAIDashboard() {
             </div>
           </div>
 
-          {/* Cryptographic Audit Trail (Append-Only Evidence Ledger) */}
+          {/* Cryptographic Audit Trail */}
           <div className="border border-slate-800 rounded-2xl bg-slate-900/40 p-5 mt-2">
             <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-800/80">
               <div className="flex items-center gap-2">
@@ -230,6 +252,16 @@ export default function OfficeAIDashboard() {
           </div>
         </main>
       </div>
+
+      {/* Central Inward / Outward Modal */}
+      <RegisterModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        sectionCode={activeSection.code}
+        sectionName={activeSection.displayName}
+        records={registers}
+        onAddRecord={handleAddRecord}
+      />
     </div>
   );
 }
