@@ -25,22 +25,24 @@ import {
 } from "lucide-react";
 
 export default function OfficeAIDashboard() {
+  const [mounted, setMounted] = useState(false);
   const [activeSection, setActiveSection] = useState<AdministrativeSection>(ADMINISTRATIVE_SECTIONS[0]);
   const [auditTrail, setAuditTrail] = useState<AuditRecord[]>([]);
-  const [operatorName, setOperatorName] = useState("Administrative Officer");
+  const [operatorName] = useState("Administrative Officer");
   const [registers, setRegisters] = useState<InwardOutwardRecord[]>(INITIAL_REGISTERS);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [isAIOpen, setIsAIOpen] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     const initialLog: AuditRecord = {
-      id: "LOG-" + Math.random().toString(36).substring(2, 9).toUpperCase(),
+      id: "LOG-INIT-01",
       timestamp: new Date().toLocaleTimeString(),
-      sectionCode: activeSection.code,
-      actor: operatorName,
+      sectionCode: ADMINISTRATIVE_SECTIONS[0].code,
+      actor: "Administrative Officer",
       action: "DESK_SESSION_INITIALIZED",
-      details: `Active desk switched to ${activeSection.displayName} under ${DPKCOP_PROFILE.shortName}`,
-      hash: "0x8f2a" + Math.random().toString(16).substring(2, 8) + "c9e",
+      details: `Active desk switched to ${ADMINISTRATIVE_SECTIONS[0].displayName} under ${DPKCOP_PROFILE.shortName}`,
+      hash: "0x8f2a49b9c9e",
     };
     setAuditTrail([initialLog]);
   }, []);
@@ -48,7 +50,7 @@ export default function OfficeAIDashboard() {
   const switchDesk = (section: AdministrativeSection) => {
     setActiveSection(section);
     const newEntry: AuditRecord = {
-      id: "LOG-" + Math.random().toString(36).substring(2, 9).toUpperCase(),
+      id: "LOG-" + Math.random().toString(36).substring(2, 8).toUpperCase(),
       timestamp: new Date().toLocaleTimeString(),
       sectionCode: section.code,
       actor: operatorName,
@@ -62,7 +64,7 @@ export default function OfficeAIDashboard() {
   const handleAddRecord = (record: InwardOutwardRecord) => {
     setRegisters((prev) => [record, ...prev]);
     const auditRecord: AuditRecord = {
-      id: "LOG-" + Math.random().toString(36).substring(2, 9).toUpperCase(),
+      id: "LOG-" + Math.random().toString(36).substring(2, 8).toUpperCase(),
       timestamp: new Date().toLocaleTimeString(),
       sectionCode: activeSection.code,
       actor: operatorName,
@@ -75,7 +77,7 @@ export default function OfficeAIDashboard() {
 
   const handleAIAuditLog = (action: string, details: string) => {
     const auditRecord: AuditRecord = {
-      id: "LOG-" + Math.random().toString(36).substring(2, 9).toUpperCase(),
+      id: "LOG-" + Math.random().toString(36).substring(2, 8).toUpperCase(),
       timestamp: new Date().toLocaleTimeString(),
       sectionCode: activeSection.code,
       actor: operatorName,
@@ -85,6 +87,14 @@ export default function OfficeAIDashboard() {
     };
     setAuditTrail((prev) => [auditRecord, ...prev.slice(0, 9)]);
   };
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-500 text-xs">
+        Initializing Office AI™ Secure Session...
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
