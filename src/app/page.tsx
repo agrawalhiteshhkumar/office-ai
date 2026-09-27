@@ -8,6 +8,8 @@ import {
   AuditRecord 
 } from "@/data/officeData";
 import { INITIAL_REGISTERS, InwardOutwardRecord } from "@/data/registerData";
+import { INSTITUTIONAL_USERS, UserPersona } from "@/data/authData";
+
 import RegisterModal from "@/components/RegisterModal";
 import AIIntelligenceModal from "@/components/AIIntelligenceModal";
 import ExamCellModal from "@/components/ExamCellModal";
@@ -15,6 +17,7 @@ import CadreRosterModal from "@/components/CadreRosterModal";
 import FRAModal from "@/components/FRAModal";
 import StoresModal from "@/components/StoresModal";
 import AdmissionsModal from "@/components/AdmissionsModal";
+
 import { 
   Building2, 
   ShieldCheck, 
@@ -34,11 +37,14 @@ import {
   UserCheck,
   Crown,
   Mail,
-  Phone
+  Phone,
+  Lock,
+  UserCircle2
 } from "lucide-react";
 
 export default function OfficeAIDashboard() {
   const [mounted, setMounted] = useState(false);
+  const [currentUser, setCurrentUser] = useState<UserPersona>(INSTITUTIONAL_USERS[0]);
   const [activeSection, setActiveSection] = useState<AdministrativeSection>(ADMINISTRATIVE_SECTIONS[0]);
   const [auditTrail, setAuditTrail] = useState<AuditRecord[]>([]);
   const [registers, setRegisters] = useState<InwardOutwardRecord[]>(INITIAL_REGISTERS);
@@ -58,40 +64,52 @@ export default function OfficeAIDashboard() {
       id: "LOG-INIT-01",
       timestamp: new Date().toLocaleTimeString(),
       sectionCode: ADMINISTRATIVE_SECTIONS[0].code,
-      actor: "Dr. Hiteshkumar Agrawal",
-      action: "DESK_SESSION_INITIALIZED",
-      details: `Active desk initialized at ${ADMINISTRATIVE_SECTIONS[0].displayName} • DPKCOP Sinnar`,
+      actor: `${currentUser.name} (${currentUser.badge})`,
+      action: "SESSION_AUTHENTICATED",
+      details: `Active role authenticated at ${ADMINISTRATIVE_SECTIONS[0].displayName} • DPKCOP Sinnar`,
       hash: "0x8f2a49b9c9e",
     };
     setAuditTrail([initialLog]);
   }, []);
 
+  const hasAccess = (deskCode: string) => {
+    if (currentUser.allowedDesks.includes("ALL")) return true;
+    return currentUser.allowedDesks.includes(deskCode as any);
+  };
+
+  const handleRoleChange = (userId: string) => {
+    const selected = INSTITUTIONAL_USERS.find((u) => u.id === userId) || INSTITUTIONAL_USERS[0];
+    setCurrentUser(selected);
+
+    const log: AuditRecord = {
+      id: "LOG-" + Math.random().toString(36).substring(2, 8).toUpperCase(),
+      timestamp: new Date().toLocaleTimeString(),
+      sectionCode: activeSection.code,
+      actor: `${selected.name} (${selected.badge})`,
+      action: "ROLE_DELEGATION_SWITCH",
+      details: `Switched operational identity to ${selected.title} [Role: ${selected.role}]`,
+      hash: "0x" + Math.random().toString(16).substring(2, 10),
+    };
+    setAuditTrail((prev) => [log, ...prev.slice(0, 9)]);
+  };
+
   const switchDesk = (section: AdministrativeSection) => {
+    if (!hasAccess(section.code)) {
+      alert(`Access Restricted: Your current role (${currentUser.badge}) does not hold delegated authority for ${section.displayName}.`);
+      return;
+    }
+
     setActiveSection(section);
     const newEntry: AuditRecord = {
       id: "LOG-" + Math.random().toString(36).substring(2, 8).toUpperCase(),
       timestamp: new Date().toLocaleTimeString(),
       sectionCode: section.code,
-      actor: "Dr. Hiteshkumar Agrawal",
-      action: "DELEGATED_CAPACITY_SWITCH",
-      details: `Switched operational desk to: ${section.displayName} (${section.deskTitle})`,
+      actor: `${currentUser.name} (${currentUser.badge})`,
+      action: "DESK_ACCESSED",
+      details: `Accessed desk: ${section.displayName} (${section.deskTitle})`,
       hash: "0x" + Math.random().toString(16).substring(2, 10),
     };
     setAuditTrail((prev) => [newEntry, ...prev.slice(0, 9)]);
-  };
-
-  const handleAddRecord = (record: InwardOutwardRecord) => {
-    setRegisters((prev) => [record, ...prev]);
-    const auditRecord: AuditRecord = {
-      id: "LOG-" + Math.random().toString(36).substring(2, 8).toUpperCase(),
-      timestamp: new Date().toLocaleTimeString(),
-      sectionCode: activeSection.code,
-      actor: "Dr. Hiteshkumar Agrawal",
-      action: record.type === "INWARD" ? "REGULATORY_INWARD_ENTRY" : "REGULATORY_OUTWARD_DISPATCH",
-      details: `Logged ${record.referenceNumber} (${record.subject.substring(0, 35)}...)`,
-      hash: "0x" + Math.random().toString(16).substring(2, 10) + "f41",
-    };
-    setAuditTrail((prev) => [auditRecord, ...prev.slice(0, 9)]);
   };
 
   const handleAuditLog = (action: string, details: string) => {
@@ -99,7 +117,7 @@ export default function OfficeAIDashboard() {
       id: "LOG-" + Math.random().toString(36).substring(2, 8).toUpperCase(),
       timestamp: new Date().toLocaleTimeString(),
       sectionCode: activeSection.code,
-      actor: "Dr. Hiteshkumar Agrawal",
+      actor: `${currentUser.name} (${currentUser.badge})`,
       action: action,
       details: details,
       hash: "0x" + Math.random().toString(16).substring(2, 10) + "ae3",
@@ -107,17 +125,30 @@ export default function OfficeAIDashboard() {
     setAuditTrail((prev) => [auditRecord, ...prev.slice(0, 9)]);
   };
 
+  const handleAddRecord = (record: InwardOutwardRecord) => {
+    setRegisters((prev) => [record, ...prev]);
+    handleAuditLog(
+      record.type === "INWARD" ? "REGULATORY_INWARD_ENTRY" : "REGULATORY_OUTWARD_DISPATCH",
+      `Logged ${record.referenceNumber} (${record.subject.substring(0, 35)}...)`
+    );
+  };
+
   const handleLaunchMandate = (mandateText: string) => {
     const lower = mandateText.toLowerCase();
     if (activeSection.code === "EXAM_CELL" || lower.includes("sessional") || lower.includes("exam")) {
+      if (!hasAccess("EXAM_CELL")) return alert("Access Restricted for your role.");
       setIsExamModalOpen(true);
     } else if (activeSection.code === "ESTABLISHMENT" || lower.includes("teacher") || lower.includes("roster") || lower.includes("staff")) {
+      if (!hasAccess("ESTABLISHMENT")) return alert("Access Restricted for your role.");
       setIsCadreModalOpen(true);
     } else if (activeSection.code === "ACCOUNTS" || lower.includes("fee") || lower.includes("fra") || lower.includes("ffc") || lower.includes("audit")) {
+      if (!hasAccess("ACCOUNTS")) return alert("Access Restricted for your role.");
       setIsFRAModalOpen(true);
     } else if (activeSection.code === "PHARMACY_STORES" || lower.includes("stock") || lower.includes("chemical") || lower.includes("procure") || lower.includes("dead stock")) {
+      if (!hasAccess("PHARMACY_STORES")) return alert("Access Restricted for your role.");
       setIsStoresModalOpen(true);
     } else if (activeSection.code === "STUDENT_ADMISSIONS" || lower.includes("admiss") || lower.includes("eligibility") || lower.includes("cap") || lower.includes("scholarship") || lower.includes("dbt")) {
+      if (!hasAccess("STUDENT_ADMISSIONS")) return alert("Access Restricted for your role.");
       setIsAdmissionsModalOpen(true);
     } else {
       setIsRegisterOpen(true);
@@ -134,10 +165,10 @@ export default function OfficeAIDashboard() {
 
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-800 flex flex-col font-sans">
-      {/* Top Header - Matching Faculty AI Genie */}
+      {/* Top Header */}
       <header className="border-b border-slate-200 bg-white sticky top-0 z-40 px-6 py-3 shadow-xs">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          {/* Brand Left with Bright Path Logo */}
+          {/* Brand Left */}
           <div className="flex items-center gap-3">
             <div className="h-11 w-11 rounded-xl bg-white border border-slate-200 p-1 flex items-center justify-center shadow-xs overflow-hidden">
               <img 
@@ -164,69 +195,134 @@ export default function OfficeAIDashboard() {
             </div>
           </div>
 
-          {/* Institutional Client Info Right */}
-          <div className="flex items-center gap-4">
-            <div className="text-right hidden md:block">
-              <div className="text-[10px] text-slate-400 font-medium">Provisioned Institutional Client</div>
-              <div className="text-xs font-bold text-slate-800">
-                D. P. Kharde Navjeevan College of Pharmacy, Sinnar
-              </div>
-              <div className="text-[10px] text-slate-500 font-mono">
-                MSBTE: 62386 • DTE: 5539 • PCI: 9178 • AISHE: S-22693
-              </div>
+          {/* Institutional Persona / Role Switcher (RBAC) */}
+          <div className="flex items-center gap-3">
+            <div className="text-right hidden sm:block">
+              <div className="text-[10px] text-slate-400 font-semibold uppercase">Active Persona</div>
+              <div className="text-xs font-bold text-slate-900">{currentUser.name}</div>
+              <div className="text-[10px] text-blue-600 font-medium">{currentUser.title}</div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <button className="px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 hover:bg-amber-100 text-amber-800 text-xs font-semibold flex items-center gap-1.5 transition">
-                <Crown className="w-3.5 h-3.5 text-amber-600" /> SuperAdmin Access
-              </button>
+            <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl border border-slate-200">
+              <UserCircle2 className="w-4 h-4 text-blue-600 ml-1.5" />
+              <select
+                value={currentUser.id}
+                onChange={(e) => handleRoleChange(e.target.value)}
+                className="bg-transparent text-xs font-bold text-slate-800 pr-2 py-1 outline-hidden cursor-pointer"
+              >
+                {INSTITUTIONAL_USERS.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.badge} • {user.role}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
 
-        {/* Quick Action Navigation Bar */}
+        {/* Quick Action Navigation Bar with RBAC access control */}
         <div className="mt-3 pt-3 border-t border-slate-100 flex items-center flex-wrap gap-2">
           <button
-            onClick={() => setIsAdmissionsModalOpen(true)}
-            className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-700 text-xs font-semibold flex items-center gap-1.5 border border-slate-200 transition"
+            onClick={() => {
+              if (!hasAccess("STUDENT_ADMISSIONS")) return alert("Access restricted for your role.");
+              setIsAdmissionsModalOpen(true);
+            }}
+            disabled={!hasAccess("STUDENT_ADMISSIONS")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 border transition ${
+              hasAccess("STUDENT_ADMISSIONS")
+                ? "bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-700 border-slate-200"
+                : "bg-slate-50 text-slate-400 border-slate-200 opacity-60 cursor-not-allowed"
+            }`}
           >
-            <UserCheck className="w-3.5 h-3.5 text-blue-600" /> Admissions & MahaDBT
+            {hasAccess("STUDENT_ADMISSIONS") ? <UserCheck className="w-3.5 h-3.5 text-blue-600" /> : <Lock className="w-3.5 h-3.5 text-slate-400" />}
+            Admissions & MahaDBT
           </button>
+
           <button
-            onClick={() => setIsStoresModalOpen(true)}
-            className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-700 text-xs font-semibold flex items-center gap-1.5 border border-slate-200 transition"
+            onClick={() => {
+              if (!hasAccess("PHARMACY_STORES")) return alert("Access restricted for your role.");
+              setIsStoresModalOpen(true);
+            }}
+            disabled={!hasAccess("PHARMACY_STORES")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 border transition ${
+              hasAccess("PHARMACY_STORES")
+                ? "bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-700 border-slate-200"
+                : "bg-slate-50 text-slate-400 border-slate-200 opacity-60 cursor-not-allowed"
+            }`}
           >
-            <Boxes className="w-3.5 h-3.5 text-orange-600" /> Stores & Dead Stock
+            {hasAccess("PHARMACY_STORES") ? <Boxes className="w-3.5 h-3.5 text-orange-600" /> : <Lock className="w-3.5 h-3.5 text-slate-400" />}
+            Stores & Dead Stock
           </button>
+
           <button
-            onClick={() => setIsFRAModalOpen(true)}
-            className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-700 text-xs font-semibold flex items-center gap-1.5 border border-slate-200 transition"
+            onClick={() => {
+              if (!hasAccess("ACCOUNTS")) return alert("Access restricted for your role.");
+              setIsFRAModalOpen(true);
+            }}
+            disabled={!hasAccess("ACCOUNTS")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 border transition ${
+              hasAccess("ACCOUNTS")
+                ? "bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-700 border-slate-200"
+                : "bg-slate-50 text-slate-400 border-slate-200 opacity-60 cursor-not-allowed"
+            }`}
           >
-            <IndianRupee className="w-3.5 h-3.5 text-emerald-600" /> FFC & FRA Fee Desk
+            {hasAccess("ACCOUNTS") ? <IndianRupee className="w-3.5 h-3.5 text-emerald-600" /> : <Lock className="w-3.5 h-3.5 text-slate-400" />}
+            FFC & FRA Fee Desk
           </button>
+
           <button
-            onClick={() => setIsCadreModalOpen(true)}
-            className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-700 text-xs font-semibold flex items-center gap-1.5 border border-slate-200 transition"
+            onClick={() => {
+              if (!hasAccess("ESTABLISHMENT")) return alert("Access restricted for your role.");
+              setIsCadreModalOpen(true);
+            }}
+            disabled={!hasAccess("ESTABLISHMENT")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 border transition ${
+              hasAccess("ESTABLISHMENT")
+                ? "bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-700 border-slate-200"
+                : "bg-slate-50 text-slate-400 border-slate-200 opacity-60 cursor-not-allowed"
+            }`}
           >
-            <Users className="w-3.5 h-3.5 text-indigo-600" /> PCI Cadre Roster
+            {hasAccess("ESTABLISHMENT") ? <Users className="w-3.5 h-3.5 text-indigo-600" /> : <Lock className="w-3.5 h-3.5 text-slate-400" />}
+            PCI Cadre Roster
           </button>
+
           <button
-            onClick={() => setIsExamModalOpen(true)}
-            className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-700 text-xs font-semibold flex items-center gap-1.5 border border-slate-200 transition"
+            onClick={() => {
+              if (!hasAccess("EXAM_CELL")) return alert("Access restricted for your role.");
+              setIsExamModalOpen(true);
+            }}
+            disabled={!hasAccess("EXAM_CELL")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 border transition ${
+              hasAccess("EXAM_CELL")
+                ? "bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-700 border-slate-200"
+                : "bg-slate-50 text-slate-400 border-slate-200 opacity-60 cursor-not-allowed"
+            }`}
           >
-            <GraduationCap className="w-3.5 h-3.5 text-violet-600" /> MSBTE Exam Cell
+            {hasAccess("EXAM_CELL") ? <GraduationCap className="w-3.5 h-3.5 text-violet-600" /> : <Lock className="w-3.5 h-3.5 text-slate-400" />}
+            MSBTE Exam Cell
           </button>
+
           <button
             onClick={() => setIsAIOpen(true)}
             className="px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold flex items-center gap-1.5 border border-blue-200 transition"
           >
             <Cpu className="w-3.5 h-3.5 text-blue-600" /> Statutory Circular AI
           </button>
+          
           <button
-            onClick={() => setIsRegisterOpen(true)}
-            className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 border border-slate-200 transition"
+            onClick={() => {
+              if (!hasAccess("CENTRAL_DESPATCH")) return alert("Access restricted for your role.");
+              setIsRegisterOpen(true);
+            }}
+            disabled={!hasAccess("CENTRAL_DESPATCH")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 border transition ${
+              hasAccess("CENTRAL_DESPATCH")
+                ? "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200"
+                : "bg-slate-50 text-slate-400 border-slate-200 opacity-60 cursor-not-allowed"
+            }`}
           >
-            <BookOpen className="w-3.5 h-3.5 text-amber-600" /> Central Despatch
+            {hasAccess("CENTRAL_DESPATCH") ? <BookOpen className="w-3.5 h-3.5 text-amber-600" /> : <Lock className="w-3.5 h-3.5 text-slate-400" />}
+            Central Despatch
           </button>
         </div>
       </header>
@@ -247,6 +343,8 @@ export default function OfficeAIDashboard() {
           <div className="flex flex-col gap-2">
             {ADMINISTRATIVE_SECTIONS.map((section) => {
               const isActive = section.id === activeSection.id;
+              const allowed = hasAccess(section.code);
+
               return (
                 <button
                   key={section.id}
@@ -254,11 +352,14 @@ export default function OfficeAIDashboard() {
                   className={`text-left p-3.5 rounded-xl border transition-all flex flex-col gap-1 ${
                     isActive
                       ? "bg-blue-600 border-blue-600 text-white shadow-sm shadow-blue-500/30"
-                      : "bg-slate-50 border-slate-200/80 hover:bg-slate-100 text-slate-700"
+                      : allowed
+                      ? "bg-slate-50 border-slate-200/80 hover:bg-slate-100 text-slate-700"
+                      : "bg-slate-50/50 border-slate-100 text-slate-400 opacity-50 cursor-not-allowed"
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className={`text-sm font-bold ${isActive ? "text-white" : "text-slate-900"}`}>
+                    <span className={`text-sm font-bold flex items-center gap-1.5 ${isActive ? "text-white" : allowed ? "text-slate-900" : "text-slate-400"}`}>
+                      {!allowed && <Lock className="w-3.5 h-3.5" />}
                       {section.displayName}
                     </span>
                     {isActive && <ChevronRight className="w-4 h-4 text-white" />}
@@ -271,17 +372,15 @@ export default function OfficeAIDashboard() {
             })}
           </div>
 
-          {/* Mapped Standards */}
+          {/* User Role Card */}
           <div className="mt-auto pt-4 border-t border-slate-200 text-xs">
-            <div className="text-[10px] uppercase font-bold text-slate-400 mb-2">
-              Mapped Statutory & Accreditation Standards
-            </div>
-            <div className="flex flex-wrap gap-1.5 font-mono text-[10px] font-semibold text-slate-600">
-              <span className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200">MSBTE</span>
-              <span className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200">PCI</span>
-              <span className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200">DTE</span>
-              <span className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200">Maha-FFC</span>
-              <span className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200">MahaDBT</span>
+            <div className="text-[10px] uppercase font-bold text-slate-400 mb-1.5">Active Delegation</div>
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl">
+              <div className="font-bold text-blue-900 text-xs">{currentUser.name}</div>
+              <div className="text-[11px] text-blue-700">{currentUser.title}</div>
+              <div className="text-[10px] font-mono text-blue-600 font-semibold mt-1">
+                Level: {currentUser.role}
+              </div>
             </div>
           </div>
         </aside>
@@ -302,7 +401,7 @@ export default function OfficeAIDashboard() {
               <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1">Assigned Desk Role</div>
               <div className="font-bold text-slate-900 text-sm">{activeSection.deskTitle}</div>
               <div className="text-[11px] text-emerald-600 font-semibold mt-1 flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5" /> Delegated Authority Active
+                <CheckCircle2 className="w-3.5 h-3.5" /> Authority Mapped & Verified
               </div>
             </div>
           </div>
@@ -335,10 +434,9 @@ export default function OfficeAIDashboard() {
             </div>
           </div>
 
-          {/* Faculty AI Genie Official Executive Signature Card */}
+          {/* Executive Signatory / Authority Card */}
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-5">
             <div className="flex items-center gap-4">
-              {/* Blue Initials Avatar identical to Faculty AI Genie */}
               <div className="h-12 w-12 rounded-xl bg-blue-600 text-white font-extrabold flex items-center justify-center text-lg shadow-sm">
                 HA
               </div>
@@ -388,7 +486,7 @@ export default function OfficeAIDashboard() {
                   <tr className="border-b border-slate-200 text-slate-400 font-semibold uppercase text-[10px]">
                     <th className="pb-2.5">Log ID</th>
                     <th className="pb-2.5">Timestamp</th>
-                    <th className="pb-2.5">Actor</th>
+                    <th className="pb-2.5">Actor (Active Persona)</th>
                     <th className="pb-2.5">Action</th>
                     <th className="pb-2.5">Details</th>
                     <th className="pb-2.5 font-mono text-right">Ledger Hash</th>
@@ -416,7 +514,7 @@ export default function OfficeAIDashboard() {
         </main>
       </div>
 
-      {/* Registers Modal */}
+      {/* Modals */}
       <RegisterModal
         isOpen={isRegisterOpen}
         onClose={() => setIsRegisterOpen(false)}
@@ -425,43 +523,31 @@ export default function OfficeAIDashboard() {
         records={registers}
         onAddRecord={handleAddRecord}
       />
-
-      {/* AI Intelligence Modal */}
       <AIIntelligenceModal
         isOpen={isAIOpen}
         onClose={() => setIsAIOpen(false)}
         onLogAudit={handleAuditLog}
       />
-
-      {/* MSBTE Exam Cell Modal */}
       <ExamCellModal
         isOpen={isExamModalOpen}
         onClose={() => setIsExamModalOpen(false)}
         onLogAudit={handleAuditLog}
       />
-
-      {/* PCI Cadre Roster Modal */}
       <CadreRosterModal
         isOpen={isCadreModalOpen}
         onClose={() => setIsCadreModalOpen(false)}
         onLogAudit={handleAuditLog}
       />
-
-      {/* Dual FFC & FRA Fee Proposal Modal */}
       <FRAModal
         isOpen={isFRAModalOpen}
         onClose={() => setIsFRAModalOpen(false)}
         onLogAudit={handleAuditLog}
       />
-
-      {/* Pharmacy Stores & Dead Stock Modal */}
       <StoresModal
         isOpen={isStoresModalOpen}
         onClose={() => setIsStoresModalOpen(false)}
         onLogAudit={handleAuditLog}
       />
-
-      {/* Student Admissions & MahaDBT Modal */}
       <AdmissionsModal
         isOpen={isAdmissionsModalOpen}
         onClose={() => setIsAdmissionsModalOpen(false)}
