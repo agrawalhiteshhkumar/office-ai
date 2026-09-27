@@ -13,8 +13,6 @@ import {
   Printer
 } from "lucide-react";
 
-type CadreFilterType = "ALL" | "PRINCIPAL" | "HOD" | "LECTURER";
-
 export default function CadreRosterModal({ 
   isOpen, 
   onClose, 
@@ -25,13 +23,13 @@ export default function CadreRosterModal({
   onLogAudit: (action: string, details: string) => void; 
 }) {
   const [facultyList] = useState<FacultyCadreRecord[]>(INITIAL_FACULTY_ROSTER);
-  const [filterDesignation, setFilterDesignation] = useState<CadreFilterType>("ALL");
+  const [filterDesignation, setFilterDesignation] = useState<string>("ALL");
 
   if (!isOpen) return null;
 
   const filtered = filterDesignation === "ALL" 
     ? facultyList 
-    : facultyList.filter((f) => f.cadreDesignation === filterDesignation);
+    : facultyList.filter((f) => f.designation === filterDesignation);
 
   const totalTeaching = facultyList.length;
   const compliantFaculty = facultyList.filter((f) => f.compliancePciNorm).length;
@@ -49,7 +47,7 @@ export default function CadreRosterModal({
       dataRows: filtered.map((f, i) => [
         i + 1,
         f.name,
-        f.cadreDesignation.replace("_", " "),
+        String(f.designation).replace("_", " "),
         f.highestQualification,
         f.department,
         f.experienceYears,
@@ -97,7 +95,7 @@ export default function CadreRosterModal({
             <span className="text-slate-500 font-bold flex items-center gap-1">
               <Filter className="w-3.5 h-3.5 text-blue-600" /> Cadre:
             </span>
-            {(["ALL", "PRINCIPAL", "HOD", "LECTURER"] as const).map((desig) => (
+            {["ALL", "PRINCIPAL", "HOD", "LECTURER"].map((desig) => (
               <button
                 key={desig}
                 onClick={() => setFilterDesignation(desig)}
@@ -145,7 +143,7 @@ export default function CadreRosterModal({
                   </td>
                   <td className="py-3">
                     <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-bold text-[10px] border border-blue-200">
-                      {f.cadreDesignation.replace("_", " ")}
+                      {String(f.designation).replace("_", " ")}
                     </span>
                   </td>
                   <td className="py-3 text-slate-700 font-medium">{f.highestQualification}</td>
