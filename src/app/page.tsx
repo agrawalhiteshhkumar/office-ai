@@ -7,21 +7,13 @@ import {
   Users, 
   Layers, 
   ShieldCheck, 
-  Printer, 
-  Search, 
   ChevronRight, 
-  Lock, 
   CheckCircle2, 
-  AlertTriangle,
-  Key,
-  Database,
-  ArrowUpRight,
-  LogOut,
   Sparkles,
-  Award,
   BadgeCheck,
   Mail,
-  Phone
+  Phone,
+  LogOut
 } from 'lucide-react';
 
 import ExamCellModal from '@/components/ExamCellModal';
@@ -110,9 +102,6 @@ export default function OfficeAIEngine() {
       try {
         const parsed = JSON.parse(savedTenants);
         setInstitutions(parsed);
-        if (parsed.length > 0 && !currentTenant) {
-          // Pre-select first for convenience
-        }
       } catch (e) {
         console.error(e);
       }
@@ -166,7 +155,6 @@ export default function OfficeAIEngine() {
     setInstitutions(updated);
     localStorage.setItem('office_ai_tenants', JSON.stringify(updated));
 
-    // Seed default staff
     const defaultStaff: StaffUser[] = [
       { id: 'STF-1', name: 'Exam Officer', email: 'exam@dpkcop.edu', role: 'EXAM_INCHARGE', deskAssigned: 'MSBTE Exam Cell', pin: '1234' },
       { id: 'STF-2', name: 'Establishment Clerk', email: 'estab@dpkcop.edu', role: 'ESTABLISHMENT_OFFICER', deskAssigned: 'PCI Cadre Roster', pin: '1234' },
@@ -250,19 +238,19 @@ export default function OfficeAIEngine() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-blue-600 selection:text-white">
+    <div className="min-h-screen bg-[#070b14] text-slate-100 flex flex-col font-sans selection:bg-blue-600 selection:text-white">
       {/* --- TOP BRANDING BAR --- */}
-      <header className="border-b border-slate-800 bg-slate-900/60 backdrop-blur-md px-6 py-3.5 flex items-center justify-between sticky top-0 z-40">
+      <header className="border-b border-slate-800/80 bg-[#0b1329]/70 backdrop-blur-md px-6 py-3.5 flex items-center justify-between sticky top-0 z-40">
         <div className="flex items-center gap-3">
           <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-blue-700 via-indigo-600 to-sky-400 p-0.5 shadow-md shadow-blue-900/20">
-            <div className="h-full w-full bg-slate-950 rounded-[10px] flex items-center justify-center">
+            <div className="h-full w-full bg-[#0b1329] rounded-[10px] flex items-center justify-center">
               <Building2 className="w-5 h-5 text-blue-400" />
             </div>
           </div>
           <div>
             <div className="flex items-center gap-2">
               <span className="font-extrabold text-white tracking-tight text-base font-serif">OFFICE AI GENIE™</span>
-              <span className="text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+              <span className="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
                 Institutional OS
               </span>
             </div>
@@ -324,55 +312,71 @@ export default function OfficeAIEngine() {
         {activeTab === 'LOGIN' && (
           <div className="flex-1 flex flex-col items-center justify-center py-6">
             
-            {/* SIGNATORY & ARCHITECT EXECUTIVE BADGE */}
-            <div className="w-full max-w-xl bg-slate-900/90 border border-slate-800 rounded-2xl p-5 mb-6 shadow-xl backdrop-blur-md">
-              <div className="flex items-center justify-between border-b border-slate-800/80 pb-3 mb-3">
-                <div className="flex items-center gap-3">
-                  <div className="h-11 w-11 rounded-xl bg-blue-600 flex items-center justify-center font-bold text-white text-base shadow-inner">
+            {/* SIGNATORY & ARCHITECT EXECUTIVE BADGE (PRISTINE WHITE CARD) */}
+            <div className="w-full max-w-xl bg-white border border-slate-200 rounded-3xl p-6 mb-6 shadow-xl text-slate-900">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
+                <div className="flex items-center gap-4">
+                  <div className="h-12 w-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center font-bold text-white text-lg shadow-md shadow-blue-500/30">
                     HA
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-extrabold text-white text-base tracking-tight">Dr. Hiteshkumar Agrawal</span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
-                        <BadgeCheck className="w-3 h-3 text-emerald-400" /> Signatory Verified
+                      <span className="font-extrabold text-slate-900 text-base tracking-tight">Dr. Hiteshkumar Agrawal</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                        <BadgeCheck className="w-3.5 h-3.5 text-emerald-600" /> Signatory Verified
                       </span>
                     </div>
-                    <div className="text-xs text-slate-400 font-medium">Founder &amp; Chief Academic Architect, Office AI Genie™</div>
-                    <div className="text-[11px] text-slate-500">Principal, D. P. Kharde Navjeevan College of Pharmacy, Sinnar</div>
+                    <div className="text-xs text-blue-600 font-bold mt-0.5">Founder &amp; Chief Academic Architect, Office AI Genie™</div>
+                    <div className="text-[11px] text-slate-500 font-medium">Principal, D. P. Kharde Navjeevan College of Pharmacy, Sinnar</div>
                   </div>
                 </div>
               </div>
-              <div className="flex flex-wrap items-center justify-between text-xs text-slate-400 gap-2 font-mono">
+              <div className="flex flex-wrap items-center justify-between text-xs text-slate-600 gap-2 font-medium">
                 <div className="flex items-center gap-1.5">
-                  <Mail className="w-3.5 h-3.5 text-blue-400" />
-                  <a href="mailto:hiteshhkumar.agrawal@gmail.com" className="hover:text-blue-300">hiteshhkumar.agrawal@gmail.com</a>
+                  <Mail className="w-4 h-4 text-blue-600" />
+                  <a href="mailto:hiteshhkumar.agrawal@gmail.com" className="hover:text-blue-700 hover:underline">hiteshhkumar.agrawal@gmail.com</a>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <Phone className="w-3.5 h-3.5 text-emerald-400" />
+                  <Phone className="w-4 h-4 text-emerald-600" />
                   <span>+91 9637521852</span>
                 </div>
               </div>
             </div>
 
-            {/* LOGIN CARD */}
-            <div className="w-full max-w-xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
-              <div className="border-b border-slate-800 bg-slate-900/50 p-1 flex">
+            {/* LOGIN CARD (PRISTINE WHITE CARD) */}
+            <div className="w-full max-w-xl bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-hidden text-slate-900">
+              {/* TAB SELECTOR */}
+              <div className="border-b border-slate-200 bg-slate-50/80 p-2 flex gap-2">
                 <button
+                  type="button"
                   onClick={() => setLoginRole('STAFF')}
-                  className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition cursor-pointer ${loginRole === 'STAFF' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                  className={`flex-1 py-2.5 text-xs font-extrabold rounded-xl transition cursor-pointer ${
+                    loginRole === 'STAFF' 
+                      ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' 
+                      : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+                  }`}
                 >
                   Desk Officer
                 </button>
                 <button
+                  type="button"
                   onClick={() => setLoginRole('PRINCIPAL')}
-                  className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition cursor-pointer ${loginRole === 'PRINCIPAL' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                  className={`flex-1 py-2.5 text-xs font-extrabold rounded-xl transition cursor-pointer ${
+                    loginRole === 'PRINCIPAL' 
+                      ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' 
+                      : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+                  }`}
                 >
                   Principal Admin
                 </button>
                 <button
+                  type="button"
                   onClick={() => setLoginRole('SUPERADMIN')}
-                  className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition cursor-pointer ${loginRole === 'SUPERADMIN' ? 'bg-amber-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                  className={`flex-1 py-2.5 text-xs font-extrabold rounded-xl transition cursor-pointer ${
+                    loginRole === 'SUPERADMIN' 
+                      ? 'bg-amber-600 text-white shadow-md shadow-amber-600/20' 
+                      : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+                  }`}
                 >
                   SuperAdmin
                 </button>
@@ -382,50 +386,50 @@ export default function OfficeAIEngine() {
                 {loginRole === 'STAFF' && (
                   <form onSubmit={handleStaffLogin} className="space-y-4">
                     <div>
-                      <span className="text-[10px] uppercase font-bold tracking-wider text-blue-400">Delegated Officer Desk</span>
-                      <h2 className="text-xl font-extrabold text-white mt-0.5">Staff &amp; Faculty Desk Login</h2>
-                      <p className="text-xs text-slate-400 mt-1">Sign in with credentials assigned by your Principal.</p>
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-blue-600">Delegated Officer Desk</span>
+                      <h2 className="text-xl font-extrabold text-slate-900 mt-0.5">Staff &amp; Faculty Desk Login</h2>
+                      <p className="text-xs text-slate-500 mt-1">Sign in with credentials assigned by your Principal.</p>
                     </div>
 
                     <div className="space-y-3 pt-2">
                       <div>
-                        <label className="block text-xs font-medium text-slate-300 mb-1">Official Desk Email</label>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Official Desk Email</label>
                         <input
                           type="email"
                           required
                           value={staffEmailInput}
                           onChange={(e) => setStaffEmailInput(e.target.value)}
                           placeholder="e.g. exam@dpkcop.edu"
-                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-slate-300 mb-1">Desk Access PIN</label>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Desk Access PIN</label>
                         <input
                           type="password"
                           required
                           value={staffPinInput}
                           onChange={(e) => setStaffPinInput(e.target.value)}
                           placeholder="••••"
-                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition font-mono"
                         />
                       </div>
                     </div>
 
                     <button
                       type="submit"
-                      className="w-full mt-4 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-3 rounded-xl transition shadow-lg shadow-blue-600/20 cursor-pointer flex items-center justify-center gap-2"
+                      className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-3 rounded-xl transition shadow-lg shadow-blue-600/25 cursor-pointer flex items-center justify-center gap-2"
                     >
                       Authenticate Desk Access &rarr;
                     </button>
 
-                    <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800 text-[11px] text-slate-400">
-                      <span className="font-bold text-slate-300 block mb-1">Demo Quick Logins (PIN: 1234):</span>
-                      <div className="grid grid-cols-2 gap-1 font-mono text-[10px]">
-                        <span className="text-blue-400 hover:underline cursor-pointer" onClick={() => { setStaffEmailInput('exam@dpkcop.edu'); setStaffPinInput('1234'); }}>exam@dpkcop.edu</span>
-                        <span className="text-blue-400 hover:underline cursor-pointer" onClick={() => { setStaffEmailInput('accounts@dpkcop.edu'); setStaffPinInput('1234'); }}>accounts@dpkcop.edu</span>
-                        <span className="text-blue-400 hover:underline cursor-pointer" onClick={() => { setStaffEmailInput('estab@dpkcop.edu'); setStaffPinInput('1234'); }}>estab@dpkcop.edu</span>
-                        <span className="text-blue-400 hover:underline cursor-pointer" onClick={() => { setStaffEmailInput('admission@dpkcop.edu'); setStaffPinInput('1234'); }}>admission@dpkcop.edu</span>
+                    <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 text-[11px] text-slate-600 mt-4">
+                      <span className="font-bold text-slate-800 block mb-1">Demo Quick Logins (PIN: 1234):</span>
+                      <div className="grid grid-cols-2 gap-1.5 font-mono text-[10px]">
+                        <span className="text-blue-600 hover:underline cursor-pointer font-medium" onClick={() => { setStaffEmailInput('exam@dpkcop.edu'); setStaffPinInput('1234'); }}>exam@dpkcop.edu</span>
+                        <span className="text-blue-600 hover:underline cursor-pointer font-medium" onClick={() => { setStaffEmailInput('accounts@dpkcop.edu'); setStaffPinInput('1234'); }}>accounts@dpkcop.edu</span>
+                        <span className="text-blue-600 hover:underline cursor-pointer font-medium" onClick={() => { setStaffEmailInput('estab@dpkcop.edu'); setStaffPinInput('1234'); }}>estab@dpkcop.edu</span>
+                        <span className="text-blue-600 hover:underline cursor-pointer font-medium" onClick={() => { setStaffEmailInput('admission@dpkcop.edu'); setStaffPinInput('1234'); }}>admission@dpkcop.edu</span>
                       </div>
                     </div>
                   </form>
@@ -434,39 +438,39 @@ export default function OfficeAIEngine() {
                 {loginRole === 'PRINCIPAL' && (
                   <form onSubmit={handlePrincipalLogin} className="space-y-4">
                     <div>
-                      <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-400">Executive Authority</span>
-                      <h2 className="text-xl font-extrabold text-white mt-0.5">Principal Administrator Login</h2>
-                      <p className="text-xs text-slate-400 mt-1">Full statutory jurisdiction over MSBTE, PCI, DTE &amp; FFC portals.</p>
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-600">Executive Authority</span>
+                      <h2 className="text-xl font-extrabold text-slate-900 mt-0.5">Principal Administrator Login</h2>
+                      <p className="text-xs text-slate-500 mt-1">Full statutory jurisdiction over MSBTE, PCI, DTE &amp; FFC portals.</p>
                     </div>
 
                     <div className="space-y-3 pt-2">
                       <div>
-                        <label className="block text-xs font-medium text-slate-300 mb-1">Principal Official Email</label>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Principal Official Email</label>
                         <input
                           type="email"
                           required
                           value={principalEmailInput}
                           onChange={(e) => setPrincipalEmailInput(e.target.value)}
                           placeholder="hiteshhkumar.agrawal@gmail.com"
-                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-slate-300 mb-1">Institutional Cryptographic Key / PIN</label>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Institutional Cryptographic Key / PIN</label>
                         <input
                           type="password"
                           required
                           value={principalKeyInput}
                           onChange={(e) => setPrincipalKeyInput(e.target.value)}
                           placeholder="BP-KEY-... or PIN: 1234"
-                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition font-mono"
                         />
                       </div>
                     </div>
 
                     <button
                       type="submit"
-                      className="w-full mt-4 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold py-3 rounded-xl transition shadow-lg shadow-emerald-600/20 cursor-pointer flex items-center justify-center gap-2"
+                      className="w-full mt-4 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-3 rounded-xl transition shadow-lg shadow-emerald-600/25 cursor-pointer flex items-center justify-center gap-2"
                     >
                       Enter Executive Command &rarr;
                     </button>
@@ -480,37 +484,37 @@ export default function OfficeAIEngine() {
                 {loginRole === 'SUPERADMIN' && (
                   <form onSubmit={handleSuperAdminLogin} className="space-y-4">
                     <div>
-                      <span className="text-[10px] uppercase font-bold tracking-wider text-amber-400">Platform Owner Gateway</span>
-                      <h2 className="text-xl font-extrabold text-white mt-0.5">SuperAdmin Console</h2>
-                      <p className="text-xs text-slate-400 mt-1">Create institutes, issue cryptographic keys, and manage tenants.</p>
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-amber-600">Platform Owner Gateway</span>
+                      <h2 className="text-xl font-extrabold text-slate-900 mt-0.5">SuperAdmin Console</h2>
+                      <p className="text-xs text-slate-500 mt-1">Create institutes, issue cryptographic keys, and manage tenants.</p>
                     </div>
 
                     <div className="space-y-3 pt-2">
                       <div>
-                        <label className="block text-xs font-medium text-slate-300 mb-1">Master Email</label>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Master Email</label>
                         <input
                           type="email"
                           required
                           value={superAdminEmail}
                           onChange={(e) => setSuperAdminEmail(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 transition"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-slate-300 mb-1">Master PIN</label>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Master PIN</label>
                         <input
                           type="password"
                           required
                           value={superAdminPin}
                           onChange={(e) => setSuperAdminPin(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500 font-mono"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 transition font-mono"
                         />
                       </div>
                     </div>
 
                     <button
                       type="submit"
-                      className="w-full mt-4 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold py-3 rounded-xl transition shadow-lg shadow-amber-600/20 cursor-pointer flex items-center justify-center gap-2"
+                      className="w-full mt-4 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold py-3 rounded-xl transition shadow-lg shadow-amber-600/25 cursor-pointer flex items-center justify-center gap-2"
                     >
                       Access Master Provisioner &rarr;
                     </button>
@@ -519,7 +523,7 @@ export default function OfficeAIEngine() {
               </div>
             </div>
             
-            <p className="text-[11px] text-slate-600 mt-6 font-mono text-center">
+            <p className="text-[11px] text-slate-500 mt-6 font-mono text-center">
               Office AI Genie™ • Statutory Multi-Tenant Operating System • v2026.4
             </p>
           </div>
