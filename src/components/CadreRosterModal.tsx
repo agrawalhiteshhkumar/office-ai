@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { FacultyCadreRecord, INITIAL_FACULTY_ROSTER, CadreDesignation } from "@/data/cadreData";
+import { FacultyCadreRecord, INITIAL_FACULTY_ROSTER } from "@/data/cadreData";
 import { generateOfficialReport } from "@/utils/printReport";
 import { 
   X, 
@@ -13,15 +13,19 @@ import {
   Printer
 } from "lucide-react";
 
-interface CadreRosterModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onLogAudit: (action: string, details: string) => void;
-}
+type CadreFilterType = "ALL" | "PRINCIPAL" | "HOD" | "LECTURER";
 
-export default function CadreRosterModal({ isOpen, onClose, onLogAudit }: CadreRosterModalProps) {
+export default function CadreRosterModal({ 
+  isOpen, 
+  onClose, 
+  onLogAudit 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  onLogAudit: (action: string, details: string) => void; 
+}) {
   const [facultyList] = useState<FacultyCadreRecord[]>(INITIAL_FACULTY_ROSTER);
-  const [filterDesignation, setFilterDesignation] = useState<CadreDesignation | "ALL">("ALL");
+  const [filterDesignation, setFilterDesignation] = useState<CadreFilterType>("ALL");
 
   if (!isOpen) return null;
 
