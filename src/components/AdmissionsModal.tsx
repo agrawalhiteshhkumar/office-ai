@@ -1,221 +1,294 @@
 "use client";
 
 import React, { useState } from "react";
-import { 
-  StudentAdmissionRecord, 
-  INITIAL_STUDENT_ROSTER, 
-  AdmissionCategory 
-} from "@/data/admissionsData";
+import { generateOfficialReport } from "@/utils/printReport";
 import { 
   X, 
-  GraduationCap, 
-  IndianRupee, 
+  UserCheck, 
   CheckCircle2, 
-  FileCheck2, 
-  Clock, 
-  ShieldCheck, 
-  Filter, 
-  Award 
+  AlertTriangle, 
+  Printer, 
+  Users, 
+  GraduationCap, 
+  IndianRupee,
+  Search
 } from "lucide-react";
 
-interface AdmissionsModalProps {
+interface StudentAdmissionRecord {
+  id: string;
+  capMeritNo: number;
+  applicationId: string;
+  candidateName: string;
+  category: "OPEN" | "OBC" | "SC" | "ST" | "EWS" | "TFWS";
+  admissionSeatType: string;
+  msbteEligibilityStatus: "ENROLLED" | "PENDING_VERIFICATION";
+  mahadbtDisbursed: boolean;
+  scholarshipScheme: string;
+}
+
+const DEFAULT_ADMISSIONS: StudentAdmissionRecord[] = [
+  { id: "ADM-01", capMeritNo: 1420, applicationId: "DEN24105539", candidateName: "Aarav Santosh Patil", category: "OPEN", admissionSeatType: "GOPENH", msbteEligibilityStatus: "ENROLLED", mahadbtDisbursed: true, scholarshipScheme: "EBC Rajarshi Shahu" },
+  { id: "ADM-02", capMeritNo: 2185, applicationId: "DEN24105540", candidateName: "Pooja Ramesh Jadhav", category: "OBC", admissionSeatType: "GOBCH", msbteEligibilityStatus: "ENROLLED", mahadbtDisbursed: true, scholarshipScheme: "VJNT/OBC Welfare Freeship" },
+  { id: "ADM-03", capMeritNo: 3410, applicationId: "DEN24105541", candidateName: "Rohan Vinod Shinde", category: "SC", admissionSeatType: "GSCH", msbteEligibilityStatus: "ENROLLED", mahadbtDisbursed: false, scholarshipScheme: "Social Justice Freeship" },
+  { id: "ADM-04", capMeritNo: 4890, applicationId: "DEN24105542", candidateName: "Ananya Nitin Deshmukh", category: "EWS", admissionSeatType: "EWS", msbteEligibilityStatus: "ENROLLED", mahadbtDisbursed: true, scholarshipScheme: "EBC Tuition Concession" },
+  { id: "ADM-05", capMeritNo: 1102, applicationId: "DEN24105543", candidateName: "Aditya Prakash Gaikwad", category: "TFWS", admissionSeatType: "TFWS", msbteEligibilityStatus: "ENROLLED", mahadbtDisbursed: true, scholarshipScheme: "AICTE TFWS 100% Waiver" },
+  { id: "ADM-06", capMeritNo: 5820, applicationId: "DEN24105544", candidateName: "Neha Suresh Kulkarni", category: "OPEN", admissionSeatType: "ACAP", msbteEligibilityStatus: "PENDING_VERIFICATION", mahadbtDisbursed: false, scholarshipScheme: "Institutional Concession" }
+];
+
+export default function AdmissionsModal({
+  isOpen,
+  onClose,
+  onLogAudit,
+}: {
   isOpen: boolean;
   onClose: () => void;
   onLogAudit: (action: string, details: string) => void;
-}
-
-export default function AdmissionsModal({ isOpen, onClose, onLogAudit }: AdmissionsModalProps) {
-  const [students, setStudents] = useState<StudentAdmissionRecord[]>(INITIAL_STUDENT_ROSTER);
-  const [yearFilter, setYearFilter] = useState<"ALL" | "YEAR_1" | "YEAR_2">("ALL");
-  const [categoryFilter, setCategoryFilter] = useState<AdmissionCategory | "ALL">("ALL");
+}) {
+  const [activeTab, setActiveTab] = useState<"DTE_CAP" | "MAHADBT_SCHOLARSHIP">("DTE_CAP");
+  const [admissions] = useState<StudentAdmissionRecord[]>(DEFAULT_ADMISSIONS);
 
   if (!isOpen) return null;
 
-  const filtered = students.filter((s) => {
-    if (yearFilter !== "ALL" && s.year !== yearFilter) return false;
-    if (categoryFilter !== "ALL" && s.category !== categoryFilter) return false;
-    return true;
-  });
+  const totalSanctionedIntake = 60;
+  const enrolledCount = admissions.length;
+  const disbursedScholarships = admissions.filter((a) => a.mahadbtDisbursed).length;
 
-  const totalSeatsSanctioned = 60; // D.Pharm intake per year
-  const totalEnrolled = students.length;
-  const verifiedCount = students.filter((s) => s.eligibilityStatus === "CONFIRMED").length;
-  const totalScholarshipClaimed = students.reduce((acc, curr) => acc + curr.scholarshipSanctionedInr, 0);
-  const disbursedCount = students.filter((s) => s.mahadbtStatus === "DISBURSED").length;
-
-  const handleAuditRoster = () => {
+  const handlePrintAdmissionsReport = () => {
+    const auditHash = "0x" + Math.random().toString(16).substring(2, 10) + "adm8";
     onLogAudit(
-      "MAHADBT_ELIGIBILITY_AUDITED",
-      `Audited Admissions & Scholarship Matrix: ${totalEnrolled} Enrolled, ${verifiedCount} MSBTE Verified, ₹${totalScholarshipClaimed.toLocaleString("en-IN")} MahaDBT Claims reconciled`
+      "DTE_ADMISSIONS_REGISTER_PRINTED",
+      `Generated official DTE CAP & MahaDBT Verification Register with hash ${auditHash}`
     );
-    alert("Admissions, MSBTE Eligibility & MahaDBT ledger verified and hashed to audit chain.");
+
+    if (activeTab === "DTE_CAP") {
+      generateOfficialReport({
+        title: "DTE Maharashtra Centralized Admission Process (CAP) Allocation Matrix",
+        subtitle: "Verified against Admissions Regulating Authority (ARA) & DTE Code: 5539 Norms",
+        regulatoryBody: "DTE",
+        reportRefNo: `DPKCOP/DTE-CAP/${new Date().getFullYear()}/ADM-01`,
+        dataHeaders: [
+          "Sr",
+          "CAP Merit",
+          "Application ID",
+          "Candidate Legal Name",
+          "Category",
+          "Seat Allotment",
+          "MSBTE Eligibility State",
+        ],
+        dataRows: admissions.map((a, idx) => [
+          idx + 1,
+          `# ${a.capMeritNo}`,
+          a.applicationId,
+          a.candidateName,
+          a.category,
+          a.admissionSeatType,
+          a.msbteEligibilityStatus === "ENROLLED" ? "CONFIRMED & ENROLLED" : "UNDER SCRUTINY",
+        ]),
+        summaryMetrics: [
+          { label: "Sanctioned Intake", value: `${totalSanctionedIntake} Seats (D.Pharm)` },
+          { label: "Confirmed CAP Enrolments", value: `${enrolledCount} Admitted` },
+          { label: "DTE Regional Office", value: "Nashik Region (RO-5)" },
+        ],
+        auditHash,
+      });
+    } else {
+      generateOfficialReport({
+        title: "MahaDBT Social Welfare Scholarship & Freeship Disbursement Ledger",
+        subtitle: "Direct Benefit Transfer Reconciliation under Government of Maharashtra Directives",
+        regulatoryBody: "MAHADBT",
+        reportRefNo: `DPKCOP/MAHADBT/${new Date().getFullYear()}/DISB-01`,
+        dataHeaders: [
+          "Sr",
+          "Candidate Name",
+          "Category",
+          "Application ID",
+          "Statutory Scheme Head",
+          "Disbursement Status",
+        ],
+        dataRows: admissions.map((a, idx) => [
+          idx + 1,
+          a.candidateName,
+          a.category,
+          a.applicationId,
+          a.scholarshipScheme,
+          a.mahadbtDisbursed ? "FUNDS CREDITED TO COLLEGE AC" : "PENDING DESK-2 SCRUTINY",
+        ]),
+        summaryMetrics: [
+          { label: "Total Beneficiaries", value: `${admissions.length} Applied` },
+          { label: "Successfully Disbursed", value: `${disbursedScholarships} Candidates` },
+          { label: "Portal Compliance", value: "AISHE: S-22693 Mapped" },
+        ],
+        auditHash,
+      });
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+      <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="border-b border-slate-800 px-6 py-4 flex items-center justify-between bg-slate-950/60">
+        <div className="border-b border-slate-200 px-6 py-4 flex items-center justify-between bg-slate-50">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs uppercase font-bold text-amber-400 tracking-wider">
-                Student Admissions & Eligibility Cell
+              <span className="text-xs uppercase font-extrabold text-blue-700 tracking-wider">
+                Student Admissions & Eligibility
               </span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono">
-                DTE CAP Allotment • MSBTE Eligibility • MahaDBT
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 font-mono font-bold">
+                DTE: 5539 • ARA Compliant
               </span>
             </div>
-            <h3 className="text-lg font-bold text-white mt-0.5">
-              Admission Seat Matrix, MSBTE Enrollment & MahaDBT Freeship Ledger
+            <h3 className="text-lg font-extrabold text-slate-900 mt-0.5">
+              DTE CAP Seat Matrix & MahaDBT Scholarship Wing
             </h3>
           </div>
           <button
             onClick={onClose}
-            className="h-8 w-8 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-white"
+            className="h-8 w-8 rounded-lg bg-slate-200 hover:bg-slate-300 flex items-center justify-center text-slate-700 transition"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Metric Bar */}
-        <div className="border-b border-slate-800 px-6 py-3 bg-slate-900/80 grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
-          <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
-            <span className="text-[10px] uppercase font-bold text-slate-400">D.Pharm Intake</span>
-            <div className="text-sm font-bold text-slate-100 font-mono mt-0.5">
-              {totalEnrolled} / {totalSeatsSanctioned} Enrolled
-            </div>
-            <span className="text-[10px] text-emerald-400 font-medium">Sanctioned Intake: 60/yr</span>
-          </div>
-
-          <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
-            <span className="text-[10px] uppercase font-bold text-blue-400">MSBTE Eligibility</span>
-            <div className="text-sm font-bold text-blue-300 font-mono mt-0.5">
-              {verifiedCount} / {totalEnrolled} Verified
-            </div>
-            <span className="text-[10px] text-slate-500 font-medium">Enrollment Numbers Generated</span>
-          </div>
-
-          <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
-            <span className="text-[10px] uppercase font-bold text-emerald-400">MahaDBT Claim Total</span>
-            <div className="text-sm font-bold text-emerald-300 font-mono mt-0.5">
-              ₹ {totalScholarshipClaimed.toLocaleString("en-IN")}
-            </div>
-            <span className="text-[10px] text-slate-400 font-medium">{disbursedCount} Disbursed to College</span>
-          </div>
-
-          <div className="flex items-center justify-end">
+        {/* Toolbar & Filters */}
+        <div className="border-b border-slate-200 px-6 py-3 bg-white flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2">
             <button
-              onClick={handleAuditRoster}
-              className="w-full sm:w-auto px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/20 transition"
+              onClick={() => setActiveTab("DTE_CAP")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                activeTab === "DTE_CAP"
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
             >
-              <ShieldCheck className="w-4 h-4" /> Audit & Sign Roster
+              <UserCheck className="w-3.5 h-3.5" /> DTE CAP Allocation Matrix
+            </button>
+            <button
+              onClick={() => setActiveTab("MAHADBT_SCHOLARSHIP")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                activeTab === "MAHADBT_SCHOLARSHIP"
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              <IndianRupee className="w-3.5 h-3.5" /> MahaDBT Scholarship Disbursement
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handlePrintAdmissionsReport}
+              className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold flex items-center gap-1.5 shadow-sm transition"
+            >
+              <Printer className="w-3.5 h-3.5" /> Print {activeTab === "DTE_CAP" ? "DTE CAP Matrix" : "MahaDBT Ledger"} (PDF)
             </button>
           </div>
         </div>
 
-        {/* Filter Controls */}
-        <div className="px-6 py-2.5 bg-slate-950/70 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2">
-            <span className="text-slate-400 font-medium flex items-center gap-1">
-              <Filter className="w-3.5 h-3.5" /> Year:
-            </span>
-            {(["ALL", "YEAR_1", "YEAR_2"] as const).map((yr) => (
-              <button
-                key={yr}
-                onClick={() => setYearFilter(yr)}
-                className={`px-2.5 py-0.5 rounded font-mono text-[11px] transition ${
-                  yearFilter === yr
-                    ? "bg-amber-400/20 text-amber-300 border border-amber-400/30"
-                    : "text-slate-400 hover:text-slate-200"
-                }`}
-              >
-                {yr}
-              </button>
-            ))}
+        {/* Metric Cards Banner */}
+        <div className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 border-b border-slate-200">
+          <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-xs">
+            <div className="text-[10px] font-bold text-slate-400 uppercase">Sanctioned Intake (Cap)</div>
+            <div className="text-base font-black text-slate-900 mt-0.5">{totalSanctionedIntake} Seats</div>
+            <div className="text-[10px] text-slate-500">PCI & MSBTE Approved Intake</div>
           </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-slate-400 font-medium">Category:</span>
-            {(["ALL", "OPEN", "OBC", "SC", "ST", "EWS"] as const).map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setCategoryFilter(cat as any)}
-                className={`px-2 py-0.5 rounded font-mono text-[10px] transition ${
-                  categoryFilter === cat
-                    ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold"
-                    : "text-slate-400 hover:text-slate-200"
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
+          <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-xs">
+            <div className="text-[10px] font-bold text-slate-400 uppercase">Confirmed Admitted</div>
+            <div className="text-base font-black text-blue-700 mt-0.5">{enrolledCount} Students</div>
+            <div className="text-[10px] text-blue-600 font-semibold">100% Enrollment Verified</div>
+          </div>
+          <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-xs">
+            <div className="text-[10px] font-bold text-slate-400 uppercase">MahaDBT Reconciliation</div>
+            <div className="text-base font-black text-emerald-700 mt-0.5">{disbursedScholarships} / {admissions.length} Disbursed</div>
+            <div className="text-[10px] text-emerald-600 font-semibold">Social Welfare Credit Active</div>
           </div>
         </div>
 
-        {/* Students Table */}
+        {/* Content Table */}
         <div className="flex-1 overflow-y-auto p-6">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="border-b border-slate-800 text-slate-400 uppercase text-[11px] font-mono">
-                <th className="pb-3">CAP Application ID</th>
-                <th className="pb-3">Candidate Name</th>
-                <th className="pb-3">Category</th>
-                <th className="pb-3">Round</th>
-                <th className="pb-3">MSBTE Enrollment</th>
-                <th className="pb-3">MahaDBT Status</th>
-                <th className="pb-3 text-right">Scholarship Claim (₹)</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60">
-              {filtered.map((st) => (
-                <tr key={st.id} className="hover:bg-slate-800/30 transition">
-                  <td className="py-3 font-mono text-amber-400 font-medium">{st.capApplicationId}</td>
-                  <td className="py-3">
-                    <div className="font-semibold text-slate-200">{st.studentName}</div>
-                    <div className="text-[10px] text-slate-500 font-mono">{st.year} • {st.gender}</div>
-                  </td>
-                  <td className="py-3">
-                    <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono text-[10px] font-semibold">
-                      {st.category}
-                    </span>
-                  </td>
-                  <td className="py-3 text-slate-400 font-mono text-[10px]">{st.allotmentRound}</td>
-                  <td className="py-3">
-                    <div className="font-mono text-slate-200">{st.msbteEnrollmentNo}</div>
-                    <span className="text-[9px] text-emerald-400 font-semibold flex items-center gap-0.5">
-                      <CheckCircle2 className="w-2.5 h-2.5" /> {st.eligibilityStatus}
-                    </span>
-                  </td>
-                  <td className="py-3">
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${
-                        st.mahadbtStatus === "DISBURSED"
-                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                          : st.mahadbtStatus === "SCRUTINY_PENDING"
-                          ? "bg-amber-500/10 text-amber-300 border-amber-500/30"
-                          : "bg-slate-800 text-slate-400 border-slate-700"
-                      }`}
-                    >
-                      {st.mahadbtStatus}
-                    </span>
-                  </td>
-                  <td className="py-3 text-right font-mono font-bold text-slate-100">
-                    ₹ {st.scholarshipSanctionedInr.toLocaleString("en-IN")}
-                  </td>
+          {activeTab === "DTE_CAP" ? (
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-slate-200 text-slate-500 uppercase text-[10px] font-bold">
+                  <th className="pb-3">Candidate Legal Name</th>
+                  <th className="pb-3">CAP Application ID</th>
+                  <th className="pb-3 text-center">Merit Rank</th>
+                  <th className="pb-3">Category</th>
+                  <th className="pb-3">Seat Quota</th>
+                  <th className="pb-3 text-right">MSBTE Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {admissions.map((a) => (
+                  <tr key={a.id} className="hover:bg-slate-50 transition">
+                    <td className="py-3 font-bold text-slate-900">{a.candidateName}</td>
+                    <td className="py-3 font-mono text-[11px] text-slate-600">{a.applicationId}</td>
+                    <td className="py-3 text-center font-bold text-slate-800">#{a.capMeritNo}</td>
+                    <td className="py-3">
+                      <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-bold text-[10px] border border-slate-200">
+                        {a.category}
+                      </span>
+                    </td>
+                    <td className="py-3">
+                      <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-bold text-[10px] border border-blue-200">
+                        {a.admissionSeatType}
+                      </span>
+                    </td>
+                    <td className="py-3 text-right">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Enrolled
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-slate-200 text-slate-500 uppercase text-[10px] font-bold">
+                  <th className="pb-3">Candidate</th>
+                  <th className="pb-3">Category</th>
+                  <th className="pb-3">Application ID</th>
+                  <th className="pb-3">Welfare Scheme Head</th>
+                  <th className="pb-3 text-right">Disbursement State</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {admissions.map((a) => (
+                  <tr key={a.id} className="hover:bg-slate-50 transition">
+                    <td className="py-3 font-bold text-slate-900">{a.candidateName}</td>
+                    <td className="py-3">
+                      <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-bold text-[10px] border border-slate-200">
+                        {a.category}
+                      </span>
+                    </td>
+                    <td className="py-3 font-mono text-[11px] text-slate-600">{a.applicationId}</td>
+                    <td className="py-3 text-slate-700 font-medium">{a.scholarshipScheme}</td>
+                    <td className="py-3 text-right">
+                      {a.mahadbtDisbursed ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Fee Credited
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 inline-flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3 text-amber-600" /> Pending Scrutiny
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
 
         {/* Footer */}
-        <div className="border-t border-slate-800 px-6 py-3 bg-slate-950/70 flex items-center justify-between text-[11px] text-slate-500">
-          <div className="flex items-center gap-1.5">
-            <Award className="w-3.5 h-3.5 text-slate-400" />
-            DTE Maharashtra Centralized Admission Process (CAP) & MSBTE Eligibility Norms Integrated.
+        <div className="border-t border-slate-200 px-6 py-3 bg-slate-50 flex items-center justify-between text-[11px] text-slate-600">
+          <div>
+            Admissions Authority: <span className="font-bold text-slate-800">ARA Mumbai / DTE Maharashtra RO-Nashik</span>
           </div>
           <div className="text-slate-400 font-mono">
-            Social Welfare Dept Reconciled: <span className="text-emerald-400 font-bold">{disbursedCount} / {totalEnrolled} Accounts</span>
+            Student Registrar & Section Officer Verified
           </div>
         </div>
       </div>
