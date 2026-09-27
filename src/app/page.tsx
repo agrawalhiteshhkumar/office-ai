@@ -12,6 +12,7 @@ import RegisterModal from "@/components/RegisterModal";
 import AIIntelligenceModal from "@/components/AIIntelligenceModal";
 import ExamCellModal from "@/components/ExamCellModal";
 import CadreRosterModal from "@/components/CadreRosterModal";
+import FRAModal from "@/components/FRAModal";
 import { 
   Building2, 
   ShieldCheck, 
@@ -25,7 +26,8 @@ import {
   BookOpen, 
   Cpu,
   GraduationCap,
-  Users
+  Users,
+  IndianRupee
 } from "lucide-react";
 
 export default function OfficeAIDashboard() {
@@ -40,6 +42,7 @@ export default function OfficeAIDashboard() {
   const [isAIOpen, setIsAIOpen] = useState(false);
   const [isExamModalOpen, setIsExamModalOpen] = useState(false);
   const [isCadreModalOpen, setIsCadreModalOpen] = useState(false);
+  const [isFRAModalOpen, setIsFRAModalOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -102,6 +105,8 @@ export default function OfficeAIDashboard() {
       setIsExamModalOpen(true);
     } else if (activeSection.code === "ESTABLISHMENT" || lower.includes("teacher") || lower.includes("roster") || lower.includes("staff")) {
       setIsCadreModalOpen(true);
+    } else if (activeSection.code === "ACCOUNTS" || lower.includes("fee") || lower.includes("fra") || lower.includes("ffc") || lower.includes("audit")) {
+      setIsFRAModalOpen(true);
     } else {
       setIsRegisterOpen(true);
     }
@@ -137,6 +142,12 @@ export default function OfficeAIDashboard() {
         </div>
 
         <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => setIsFRAModalOpen(true)}
+            className="px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 text-amber-300 text-xs font-semibold flex items-center gap-1.5 transition"
+          >
+            <IndianRupee className="w-3.5 h-3.5" /> FFC & FRA Fee Desk
+          </button>
           <button
             onClick={() => setIsCadreModalOpen(true)}
             className="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 text-emerald-300 text-xs font-semibold flex items-center gap-1.5 transition"
@@ -208,7 +219,7 @@ export default function OfficeAIDashboard() {
           <div className="mt-auto pt-4 border-t border-slate-800 text-xs text-slate-400 flex flex-col gap-2">
             <div className="text-[11px] font-semibold text-slate-300">Regulatory Frameworks</div>
             <div className="flex flex-wrap gap-1.5">
-              {["MSBTE Norms", "PCI SIF-E", "FRA Proposal", "MahaDBT"].map((badge) => (
+              {["MSBTE Norms", "PCI SIF-E", "FFC Proposal", "FRA Proposal", "MahaDBT"].map((badge) => (
                 <span key={badge} className="px-2 py-0.5 rounded bg-slate-800/80 text-[10px] text-slate-300 border border-slate-700">
                   {badge}
                 </span>
@@ -342,6 +353,13 @@ export default function OfficeAIDashboard() {
       <CadreRosterModal
         isOpen={isCadreModalOpen}
         onClose={() => setIsCadreModalOpen(false)}
+        onLogAudit={handleAuditLog}
+      />
+
+      {/* Dual FFC & FRA Fee Proposal Modal */}
+      <FRAModal
+        isOpen={isFRAModalOpen}
+        onClose={() => setIsFRAModalOpen(false)}
         onLogAudit={handleAuditLog}
       />
     </div>
