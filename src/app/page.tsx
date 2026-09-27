@@ -14,6 +14,7 @@ import ExamCellModal from "@/components/ExamCellModal";
 import CadreRosterModal from "@/components/CadreRosterModal";
 import FRAModal from "@/components/FRAModal";
 import StoresModal from "@/components/StoresModal";
+import AdmissionsModal from "@/components/AdmissionsModal";
 import { 
   Building2, 
   ShieldCheck, 
@@ -29,7 +30,8 @@ import {
   GraduationCap,
   Users,
   IndianRupee,
-  Boxes
+  Boxes,
+  UserCheck
 } from "lucide-react";
 
 export default function OfficeAIDashboard() {
@@ -46,6 +48,7 @@ export default function OfficeAIDashboard() {
   const [isCadreModalOpen, setIsCadreModalOpen] = useState(false);
   const [isFRAModalOpen, setIsFRAModalOpen] = useState(false);
   const [isStoresModalOpen, setIsStoresModalOpen] = useState(false);
+  const [isAdmissionsModalOpen, setIsAdmissionsModalOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -112,6 +115,8 @@ export default function OfficeAIDashboard() {
       setIsFRAModalOpen(true);
     } else if (activeSection.code === "PHARMACY_STORES" || lower.includes("stock") || lower.includes("chemical") || lower.includes("procure") || lower.includes("dead stock")) {
       setIsStoresModalOpen(true);
+    } else if (activeSection.code === "STUDENT_ADMISSIONS" || lower.includes("admiss") || lower.includes("eligibility") || lower.includes("cap") || lower.includes("scholarship") || lower.includes("dbt")) {
+      setIsAdmissionsModalOpen(true);
     } else {
       setIsRegisterOpen(true);
     }
@@ -147,6 +152,12 @@ export default function OfficeAIDashboard() {
         </div>
 
         <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => setIsAdmissionsModalOpen(true)}
+            className="px-3 py-1.5 rounded-lg bg-teal-500/10 border border-teal-500/30 hover:bg-teal-500/20 text-teal-300 text-xs font-semibold flex items-center gap-1.5 transition"
+          >
+            <UserCheck className="w-3.5 h-3.5" /> Admissions & MahaDBT
+          </button>
           <button
             onClick={() => setIsStoresModalOpen(true)}
             className="px-3 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/30 hover:bg-orange-500/20 text-orange-300 text-xs font-semibold flex items-center gap-1.5 transition"
@@ -378,6 +389,13 @@ export default function OfficeAIDashboard() {
       <StoresModal
         isOpen={isStoresModalOpen}
         onClose={() => setIsStoresModalOpen(false)}
+        onLogAudit={handleAuditLog}
+      />
+
+      {/* Student Admissions & MahaDBT Modal */}
+      <AdmissionsModal
+        isOpen={isAdmissionsModalOpen}
+        onClose={() => setIsAdmissionsModalOpen(false)}
         onLogAudit={handleAuditLog}
       />
     </div>
