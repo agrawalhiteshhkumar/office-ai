@@ -11,6 +11,7 @@ import { INITIAL_REGISTERS, InwardOutwardRecord } from "@/data/registerData";
 import RegisterModal from "@/components/RegisterModal";
 import AIIntelligenceModal from "@/components/AIIntelligenceModal";
 import ExamCellModal from "@/components/ExamCellModal";
+import CadreRosterModal from "@/components/CadreRosterModal";
 import { 
   Building2, 
   ShieldCheck, 
@@ -23,7 +24,8 @@ import {
   ExternalLink, 
   BookOpen, 
   Cpu,
-  GraduationCap
+  GraduationCap,
+  Users
 } from "lucide-react";
 
 export default function OfficeAIDashboard() {
@@ -32,9 +34,12 @@ export default function OfficeAIDashboard() {
   const [auditTrail, setAuditTrail] = useState<AuditRecord[]>([]);
   const [operatorName] = useState("Administrative Officer");
   const [registers, setRegisters] = useState<InwardOutwardRecord[]>(INITIAL_REGISTERS);
+  
+  // Modals
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [isAIOpen, setIsAIOpen] = useState(false);
   const [isExamModalOpen, setIsExamModalOpen] = useState(false);
+  const [isCadreModalOpen, setIsCadreModalOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -92,8 +97,11 @@ export default function OfficeAIDashboard() {
   };
 
   const handleLaunchMandate = (mandateText: string) => {
-    if (activeSection.code === "EXAM_CELL" || mandateText.toLowerCase().includes("sessional") || mandateText.toLowerCase().includes("exam")) {
+    const lower = mandateText.toLowerCase();
+    if (activeSection.code === "EXAM_CELL" || lower.includes("sessional") || lower.includes("exam")) {
       setIsExamModalOpen(true);
+    } else if (activeSection.code === "ESTABLISHMENT" || lower.includes("teacher") || lower.includes("roster") || lower.includes("staff")) {
+      setIsCadreModalOpen(true);
     } else {
       setIsRegisterOpen(true);
     }
@@ -109,7 +117,7 @@ export default function OfficeAIDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-      {/* Top Institutional Header */}
+      {/* Header */}
       <header className="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-40 px-6 py-3.5 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
@@ -128,24 +136,30 @@ export default function OfficeAIDashboard() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => setIsCadreModalOpen(true)}
+            className="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 text-emerald-300 text-xs font-semibold flex items-center gap-1.5 transition"
+          >
+            <Users className="w-3.5 h-3.5" /> PCI Cadre Roster
+          </button>
           <button
             onClick={() => setIsExamModalOpen(true)}
-            className="px-3.5 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/30 hover:bg-blue-500/20 text-blue-300 text-xs font-semibold flex items-center gap-2 transition"
+            className="px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/30 hover:bg-blue-500/20 text-blue-300 text-xs font-semibold flex items-center gap-1.5 transition"
           >
             <GraduationCap className="w-3.5 h-3.5" /> MSBTE Exam Cell
           </button>
           <button
             onClick={() => setIsAIOpen(true)}
-            className="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-amber-500/20 to-amber-600/20 border border-amber-500/40 hover:bg-amber-500/30 text-amber-300 text-xs font-semibold flex items-center gap-2 transition shadow-sm"
+            className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-500/20 to-amber-600/20 border border-amber-500/40 hover:bg-amber-500/30 text-amber-300 text-xs font-semibold flex items-center gap-1.5 transition shadow-sm"
           >
             <Cpu className="w-3.5 h-3.5" /> Statutory Circular AI
           </button>
           <button
             onClick={() => setIsRegisterOpen(true)}
-            className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-2 transition"
+            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition"
           >
-            <BookOpen className="w-3.5 h-3.5 text-amber-400" /> Central Despatch Hub
+            <BookOpen className="w-3.5 h-3.5 text-amber-400" /> Central Despatch
           </button>
           <div className="h-8 w-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-xs text-slate-300">
             AO
@@ -205,7 +219,7 @@ export default function OfficeAIDashboard() {
 
         {/* Center Active Desk Operations */}
         <main className="flex-1 p-6 lg:p-8 flex flex-col gap-6 overflow-y-auto">
-          {/* Active Desk Header Banner */}
+          {/* Desk Header Banner */}
           <div className="bg-gradient-to-r from-slate-900 to-slate-900/40 border border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
@@ -226,7 +240,7 @@ export default function OfficeAIDashboard() {
             </div>
           </div>
 
-          {/* Primary Desk Mandates */}
+          {/* Mandates */}
           <div>
             <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
               <FileText className="w-4 h-4 text-amber-400" /> Operational Mandates & Workflows
@@ -252,7 +266,7 @@ export default function OfficeAIDashboard() {
             </div>
           </div>
 
-          {/* Cryptographic Audit Trail */}
+          {/* Audit Ledger */}
           <div className="border border-slate-800 rounded-2xl bg-slate-900/40 p-5 mt-2">
             <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-800/80">
               <div className="flex items-center gap-2">
@@ -321,6 +335,13 @@ export default function OfficeAIDashboard() {
       <ExamCellModal
         isOpen={isExamModalOpen}
         onClose={() => setIsExamModalOpen(false)}
+        onLogAudit={handleAuditLog}
+      />
+
+      {/* PCI Cadre Roster Modal */}
+      <CadreRosterModal
+        isOpen={isCadreModalOpen}
+        onClose={() => setIsCadreModalOpen(false)}
         onLogAudit={handleAuditLog}
       />
     </div>
