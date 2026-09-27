@@ -8,6 +8,13 @@ import {
   STORAGE_KEYS 
 } from "@/data/authData";
 
+// Statutory Modal & Print Engines
+import ExamCellModal from "@/components/ExamCellModal";
+import CadreRosterModal from "@/components/CadreRosterModal";
+import FRAModal from "@/components/FRAModal";
+import StoresModal from "@/components/StoresModal";
+import AdmissionsModal from "@/components/AdmissionsModal";
+
 import { 
   Building2, 
   ShieldCheck, 
@@ -31,7 +38,9 @@ import {
   ShieldAlert,
   Key,
   BadgeCheck,
-  Building
+  Building,
+  Printer,
+  FileCheck
 } from "lucide-react";
 
 export default function OfficeAIEngine() {
@@ -85,7 +94,14 @@ export default function OfficeAIEngine() {
   const [deskRecords, setDeskRecords] = useState<any[]>([]);
   const [auditLedger, setAuditLedger] = useState<any[]>([]);
 
-  // Modals / Entry forms
+  // Modals States for Statutory Print Engines
+  const [isExamModalOpen, setIsExamModalOpen] = useState(false);
+  const [isCadreModalOpen, setIsCadreModalOpen] = useState(false);
+  const [isFRAModalOpen, setIsFRAModalOpen] = useState(false);
+  const [isStoresModalOpen, setIsStoresModalOpen] = useState(false);
+  const [isAdmissionsModalOpen, setIsAdmissionsModalOpen] = useState(false);
+
+  // Custom Record Creator Modal
   const [showAddEntryModal, setShowAddEntryModal] = useState(false);
   const [entryField1, setEntryField1] = useState("");
   const [entryField2, setEntryField2] = useState("");
@@ -262,7 +278,6 @@ export default function OfficeAIEngine() {
       return;
     }
 
-    // Accepts either default PIN (1234) or the generated cryptographic license key
     if (matchedPrincipal.accessPin === cleanSecret || tenant.licenseKey === cleanSecret) {
       setSessionUser(matchedPrincipal);
       setSessionTenant(tenant);
@@ -309,11 +324,25 @@ export default function OfficeAIEngine() {
     setAuthError("");
   };
 
-  // Blank record creator
+  // Audit logger passed to modals
+  const handleLogAudit = (action: string, details: string) => {
+    const log = {
+      id: "LOG-" + Math.random().toString(16).substring(2, 8).toUpperCase(),
+      timestamp: new Date().toLocaleTimeString(),
+      actor: `${sessionUser?.name} (${sessionUser?.designationTitle})`,
+      action: action,
+      details: details,
+      hash: "0x" + Math.random().toString(16).substring(2, 10),
+    };
+    setAuditLedger((prev) => [log, ...prev]);
+  };
+
+  // Custom record creator
   const handleAddBlankRecord = () => {
     if (!entryField1) return;
     const newRecord = {
       id: "REC-" + Date.now().toString().slice(-4),
+      desk: activeDesk,
       field1: entryField1,
       field2: entryField2,
       field3: entryField3,
@@ -321,16 +350,7 @@ export default function OfficeAIEngine() {
       officer: sessionUser?.name || "Officer",
     };
     setDeskRecords([newRecord, ...deskRecords]);
-
-    const log = {
-      id: "LOG-" + Math.random().toString(16).substring(2, 8).toUpperCase(),
-      timestamp: new Date().toLocaleTimeString(),
-      actor: `${sessionUser?.name} (${sessionUser?.designationTitle})`,
-      action: "STATUTORY_ENTRY_SAVED",
-      details: `Added ${entryField1} in ${activeDesk}`,
-      hash: "0x" + Math.random().toString(16).substring(2, 10),
-    };
-    setAuditLedger([log, ...auditLedger]);
+    handleLogAudit("STATUTORY_ENTRY_SAVED", `Added ${entryField1} in ${activeDesk}`);
 
     setEntryField1("");
     setEntryField2("");
@@ -392,7 +412,7 @@ export default function OfficeAIEngine() {
             </button>
           </div>
 
-          {/* GATEWAY 1: DESK OFFICER LOGIN (Created by Principal) */}
+          {/* GATEWAY 1: DESK OFFICER LOGIN */}
           {portalTab === "OFFICER_LOGIN" && (
             <div className="space-y-4">
               <div>
@@ -453,7 +473,7 @@ export default function OfficeAIEngine() {
             </div>
           )}
 
-          {/* GATEWAY 2: PRINCIPAL / INSTITUTE ADMIN LOGIN */}
+          {/* GATEWAY 2: PRINCIPAL ADMIN */}
           {portalTab === "PRINCIPAL_LOGIN" && (
             <div className="space-y-4">
               <div>
@@ -517,7 +537,7 @@ export default function OfficeAIEngine() {
             </div>
           )}
 
-          {/* GATEWAY 3: SUPER ADMIN (PLATFORM OWNER) */}
+          {/* GATEWAY 3: SUPER ADMIN */}
           {portalTab === "SUPER_ADMIN" && (
             <div className="space-y-4">
               <div>
@@ -595,14 +615,13 @@ export default function OfficeAIEngine() {
         </header>
 
         <main className="max-w-6xl w-full mx-auto p-6 space-y-6 flex-1">
-          {/* Tenant Provisioning Form */}
           <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
             <div className="flex items-center gap-2 mb-1">
               <Building className="w-5 h-5 text-blue-600" />
               <h2 className="text-base font-extrabold text-slate-900">Provision New College & Generate License Key</h2>
             </div>
             <p className="text-xs text-slate-500 mb-4">
-              Provisioning an institute registers its statutory codes, generates a cryptographic license key, and creates the Principal Admin account.
+              Provisioning registers the institute, issues a cryptographic license key, and activates the Principal Admin account.
             </p>
 
             {generatedKeyNotice && (
@@ -728,7 +747,6 @@ export default function OfficeAIEngine() {
             </button>
           </div>
 
-          {/* Provisioned Tenants List */}
           <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
             <h2 className="text-base font-extrabold text-slate-900 mb-3">
               Provisioned Colleges & Keys ({tenants.length})
@@ -771,7 +789,7 @@ export default function OfficeAIEngine() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
-      {/* Header */}
+      {/* Top Header */}
       <header className="border-b border-slate-200 bg-white sticky top-0 z-40 px-6 py-3 shadow-xs">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -804,7 +822,7 @@ export default function OfficeAIEngine() {
           </div>
         </div>
 
-        {/* Desk Switcher */}
+        {/* Operational Desk Navigation */}
         <div className="mt-3 pt-3 border-t border-slate-100 flex items-center flex-wrap gap-2 text-xs">
           <button
             onClick={() => setActiveDesk("OVERVIEW")}
@@ -823,6 +841,17 @@ export default function OfficeAIEngine() {
               }`}
             >
               <Users className="w-3.5 h-3.5" /> Delegate Officer Roles
+            </button>
+          )}
+
+          {(sessionUser.allowedDesks.includes("ALL") || sessionUser.allowedDesks.includes("ESTABLISHMENT")) && (
+            <button
+              onClick={() => setActiveDesk("ESTABLISHMENT")}
+              className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 ${
+                activeDesk === "ESTABLISHMENT" ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              <Users className="w-3.5 h-3.5 text-indigo-600" /> PCI Cadre Roster
             </button>
           )}
 
@@ -874,7 +903,7 @@ export default function OfficeAIEngine() {
 
       {/* Main Workspace Body */}
       <main className="p-6 max-w-6xl w-full mx-auto space-y-6 flex-1">
-        {/* VIEW A: ROLE DELEGATION (PRINCIPAL ADMIN ONLY) */}
+        {/* VIEW A: ROLE DELEGATION (PRINCIPAL ONLY) */}
         {activeDesk === "ROLE_MANAGEMENT" && isPrincipal && (
           <div className="space-y-6">
             <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
@@ -925,6 +954,7 @@ export default function OfficeAIEngine() {
                     className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-bold"
                   >
                     <option value="EXAM_CELL">MSBTE Exam Cell</option>
+                    <option value="ESTABLISHMENT">PCI Cadre Roster</option>
                     <option value="ACCOUNTS">FFC/FRA Accounts</option>
                     <option value="PHARMACY_STORES">Stores & Solvents</option>
                     <option value="STUDENT_ADMISSIONS">Admissions & MahaDBT</option>
@@ -950,7 +980,6 @@ export default function OfficeAIEngine() {
               </button>
             </div>
 
-            {/* Created Officers List */}
             <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
               <h3 className="text-sm font-extrabold text-slate-900 mb-3">
                 Active Staff & Desk Officers for {sessionTenant?.name}
@@ -979,7 +1008,7 @@ export default function OfficeAIEngine() {
           </div>
         )}
 
-        {/* VIEW B: BLANK OPERATIONAL DESK VIEW (NO MOCK DATA) */}
+        {/* VIEW B: ACTIVE STATUTORY DESK WITH PRINT ENGINE RE-LINKED */}
         {activeDesk !== "OVERVIEW" && activeDesk !== "ROLE_MANAGEMENT" && (
           <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
@@ -987,25 +1016,79 @@ export default function OfficeAIEngine() {
                 <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">
                   LIVE STATUTORY DESK
                 </span>
-                <h2 className="text-lg font-extrabold text-slate-900">{activeDesk.replace("_", " ")} Register</h2>
-                <p className="text-xs text-slate-500">Official live statutory register. Starts completely blank.</p>
+                <h2 className="text-lg font-extrabold text-slate-900">
+                  {activeDesk === "EXAM_CELL" && "MSBTE Examination Cell"}
+                  {activeDesk === "ESTABLISHMENT" && "PCI Teaching Cadre & Approvals"}
+                  {activeDesk === "ACCOUNTS" && "Fees Regulating Committee (FFC / FRA) Accounts"}
+                  {activeDesk === "PHARMACY_STORES" && "Pharmacy Stores & Hazardous Solvents"}
+                  {activeDesk === "STUDENT_ADMISSIONS" && "DTE CAP Admissions & MahaDBT"}
+                </h2>
+                <p className="text-xs text-slate-500">Official live statutory register and verified PDF report generation engine.</p>
               </div>
 
-              <button
-                onClick={() => setShowAddEntryModal(true)}
-                className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 transition"
-              >
-                <PlusCircle className="w-3.5 h-3.5" /> Add New Record
-              </button>
+              {/* Integrated Statutory Print & Export Launchers */}
+              <div className="flex items-center gap-2">
+                {activeDesk === "EXAM_CELL" && (
+                  <button
+                    onClick={() => setIsExamModalOpen(true)}
+                    className="px-3.5 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-sm"
+                  >
+                    <Printer className="w-3.5 h-3.5" /> Launch MSBTE Exam & Print Engine
+                  </button>
+                )}
+
+                {activeDesk === "ESTABLISHMENT" && (
+                  <button
+                    onClick={() => setIsCadreModalOpen(true)}
+                    className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-sm"
+                  >
+                    <Printer className="w-3.5 h-3.5" /> Launch PCI Cadre Matrix & PDF
+                  </button>
+                )}
+
+                {activeDesk === "ACCOUNTS" && (
+                  <button
+                    onClick={() => setIsFRAModalOpen(true)}
+                    className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-sm"
+                  >
+                    <Printer className="w-3.5 h-3.5" /> Launch FFC/FRA Fee Proposal Engine
+                  </button>
+                )}
+
+                {activeDesk === "PHARMACY_STORES" && (
+                  <button
+                    onClick={() => setIsStoresModalOpen(true)}
+                    className="px-3.5 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-sm"
+                  >
+                    <Printer className="w-3.5 h-3.5" /> Launch SIF-E Stores & Solvents Matrix
+                  </button>
+                )}
+
+                {activeDesk === "STUDENT_ADMISSIONS" && (
+                  <button
+                    onClick={() => setIsAdmissionsModalOpen(true)}
+                    className="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-sm"
+                  >
+                    <Printer className="w-3.5 h-3.5" /> Launch DTE CAP & MahaDBT Matrix
+                  </button>
+                )}
+
+                <button
+                  onClick={() => setShowAddEntryModal(true)}
+                  className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 transition"
+                >
+                  <PlusCircle className="w-3.5 h-3.5" /> Add Manual Entry
+                </button>
+              </div>
             </div>
 
-            {/* Blank State Table */}
-            {deskRecords.length === 0 ? (
+            {/* Desk Records List */}
+            {deskRecords.filter(r => r.desk === activeDesk).length === 0 ? (
               <div className="py-16 text-center border-2 border-dashed border-slate-200 rounded-xl">
                 <FileText className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                 <div className="text-xs font-bold text-slate-700">No Records Found in {activeDesk}</div>
                 <div className="text-[11px] text-slate-400 mt-0.5">
-                  All mock records have been removed. Click "Add New Record" to log your first verified statutory entry.
+                  Launch the official print engine above or click "Add Manual Entry" to log your first verified entry.
                 </div>
               </div>
             ) : (
@@ -1022,7 +1105,7 @@ export default function OfficeAIEngine() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {deskRecords.map((r) => (
+                    {deskRecords.filter(r => r.desk === activeDesk).map((r) => (
                       <tr key={r.id} className="text-slate-700">
                         <td className="py-2.5 font-mono font-bold text-slate-900">{r.id}</td>
                         <td className="py-2.5 font-semibold text-slate-900">{r.field1}</td>
@@ -1056,7 +1139,7 @@ export default function OfficeAIEngine() {
               </div>
             </div>
 
-            {/* Audit Ledger */}
+            {/* Audit Trail */}
             <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
               <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
                 <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
@@ -1068,7 +1151,7 @@ export default function OfficeAIEngine() {
               </div>
               {auditLedger.length === 0 ? (
                 <div className="text-xs text-slate-400 py-6 text-center">
-                  Ledger active. Any entries created by desk officers will appear here with cryptographic hashes.
+                  Ledger active. Any entries created by desk officers or report printouts will appear here with cryptographic hashes.
                 </div>
               ) : (
                 <div className="divide-y divide-slate-100 text-xs">
@@ -1089,7 +1172,7 @@ export default function OfficeAIEngine() {
         )}
       </main>
 
-      {/* Entry Creator Modal */}
+      {/* Manual Entry Creator Modal */}
       {showAddEntryModal && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
           <div className="bg-white border border-slate-200 rounded-2xl p-6 max-w-md w-full shadow-2xl">
@@ -1098,7 +1181,7 @@ export default function OfficeAIEngine() {
 
             <div className="space-y-3 text-xs">
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Primary Title / Item / Subject *</label>
+                <label className="font-bold text-slate-700 block mb-1">Primary Title / Subject / Name *</label>
                 <input
                   type="text"
                   value={entryField1}
@@ -1143,6 +1226,33 @@ export default function OfficeAIEngine() {
           </div>
         </div>
       )}
+
+      {/* Statutory PDF / Print Engine Modals */}
+      <ExamCellModal
+        isOpen={isExamModalOpen}
+        onClose={() => setIsExamModalOpen(false)}
+        onLogAudit={handleLogAudit}
+      />
+      <CadreRosterModal
+        isOpen={isCadreModalOpen}
+        onClose={() => setIsCadreModalOpen(false)}
+        onLogAudit={handleLogAudit}
+      />
+      <FRAModal
+        isOpen={isFRAModalOpen}
+        onClose={() => setIsFRAModalOpen(false)}
+        onLogAudit={handleLogAudit}
+      />
+      <StoresModal
+        isOpen={isStoresModalOpen}
+        onClose={() => setIsStoresModalOpen(false)}
+        onLogAudit={handleLogAudit}
+      />
+      <AdmissionsModal
+        isOpen={isAdmissionsModalOpen}
+        onClose={() => setIsAdmissionsModalOpen(false)}
+        onLogAudit={handleLogAudit}
+      />
     </div>
   );
 }
