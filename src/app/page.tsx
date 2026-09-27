@@ -10,6 +10,7 @@ import {
 import { INITIAL_REGISTERS, InwardOutwardRecord } from "@/data/registerData";
 import RegisterModal from "@/components/RegisterModal";
 import AIIntelligenceModal from "@/components/AIIntelligenceModal";
+import ExamCellModal from "@/components/ExamCellModal";
 import { 
   Building2, 
   ShieldCheck, 
@@ -21,7 +22,8 @@ import {
   ChevronRight, 
   ExternalLink, 
   BookOpen, 
-  Cpu 
+  Cpu,
+  GraduationCap
 } from "lucide-react";
 
 export default function OfficeAIDashboard() {
@@ -32,6 +34,7 @@ export default function OfficeAIDashboard() {
   const [registers, setRegisters] = useState<InwardOutwardRecord[]>(INITIAL_REGISTERS);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [isAIOpen, setIsAIOpen] = useState(false);
+  const [isExamModalOpen, setIsExamModalOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -75,7 +78,7 @@ export default function OfficeAIDashboard() {
     setAuditTrail((prev) => [auditRecord, ...prev.slice(0, 9)]);
   };
 
-  const handleAIAuditLog = (action: string, details: string) => {
+  const handleAuditLog = (action: string, details: string) => {
     const auditRecord: AuditRecord = {
       id: "LOG-" + Math.random().toString(36).substring(2, 8).toUpperCase(),
       timestamp: new Date().toLocaleTimeString(),
@@ -86,6 +89,14 @@ export default function OfficeAIDashboard() {
       hash: "0x" + Math.random().toString(16).substring(2, 10) + "ae3",
     };
     setAuditTrail((prev) => [auditRecord, ...prev.slice(0, 9)]);
+  };
+
+  const handleLaunchMandate = (mandateText: string) => {
+    if (activeSection.code === "EXAM_CELL" || mandateText.toLowerCase().includes("sessional") || mandateText.toLowerCase().includes("exam")) {
+      setIsExamModalOpen(true);
+    } else {
+      setIsRegisterOpen(true);
+    }
   };
 
   if (!mounted) {
@@ -118,6 +129,12 @@ export default function OfficeAIDashboard() {
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsExamModalOpen(true)}
+            className="px-3.5 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/30 hover:bg-blue-500/20 text-blue-300 text-xs font-semibold flex items-center gap-2 transition"
+          >
+            <GraduationCap className="w-3.5 h-3.5" /> MSBTE Exam Cell
+          </button>
           <button
             onClick={() => setIsAIOpen(true)}
             className="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-amber-500/20 to-amber-600/20 border border-amber-500/40 hover:bg-amber-500/30 text-amber-300 text-xs font-semibold flex items-center gap-2 transition shadow-sm"
@@ -225,7 +242,7 @@ export default function OfficeAIDashboard() {
                     <h4 className="text-sm font-semibold text-slate-200 mt-1">{mandate}</h4>
                   </div>
                   <button 
-                    onClick={() => setIsRegisterOpen(true)}
+                    onClick={() => handleLaunchMandate(mandate)}
                     className="text-xs text-amber-400 hover:text-amber-300 font-medium inline-flex items-center gap-1 self-start"
                   >
                     Launch Register <ExternalLink className="w-3 h-3" />
@@ -283,7 +300,7 @@ export default function OfficeAIDashboard() {
         </main>
       </div>
 
-      {/* Central Inward / Outward Modal */}
+      {/* Registers Modal */}
       <RegisterModal
         isOpen={isRegisterOpen}
         onClose={() => setIsRegisterOpen(false)}
@@ -293,11 +310,18 @@ export default function OfficeAIDashboard() {
         onAddRecord={handleAddRecord}
       />
 
-      {/* AI Circular Intelligence Modal */}
+      {/* AI Intelligence Modal */}
       <AIIntelligenceModal
         isOpen={isAIOpen}
         onClose={() => setIsAIOpen(false)}
-        onLogAudit={handleAIAuditLog}
+        onLogAudit={handleAuditLog}
+      />
+
+      {/* MSBTE Exam Cell Modal */}
+      <ExamCellModal
+        isOpen={isExamModalOpen}
+        onClose={() => setIsExamModalOpen(false)}
+        onLogAudit={handleAuditLog}
       />
     </div>
   );
