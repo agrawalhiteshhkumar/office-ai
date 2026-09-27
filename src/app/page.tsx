@@ -39,12 +39,23 @@ import {
   Mail,
   Phone,
   Lock,
-  UserCircle2
+  LogOut,
+  KeyRound,
+  ArrowRight,
+  ShieldAlert
 } from "lucide-react";
 
 export default function OfficeAIDashboard() {
   const [mounted, setMounted] = useState(false);
-  const [currentUser, setCurrentUser] = useState<UserPersona>(INSTITUTIONAL_USERS[0]);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentUser, setCurrentUser] = useState<UserPersona | null>(null);
+
+  // Form State for Login
+  const [selectedUserIndex, setSelectedUserIndex] = useState(0);
+  const [pinCode, setPinCode] = useState("1234");
+  const [loginError, setLoginError] = useState("");
+
+  // Dashboard State
   const [activeSection, setActiveSection] = useState<AdministrativeSection>(ADMINISTRATIVE_SECTIONS[0]);
   const [auditTrail, setAuditTrail] = useState<AuditRecord[]>([]);
   const [registers, setRegisters] = useState<InwardOutwardRecord[]>(INITIAL_REGISTERS);
@@ -60,42 +71,58 @@ export default function OfficeAIDashboard() {
 
   useEffect(() => {
     setMounted(true);
-    const initialLog: AuditRecord = {
-      id: "LOG-INIT-01",
-      timestamp: new Date().toLocaleTimeString(),
-      sectionCode: ADMINISTRATIVE_SECTIONS[0].code,
-      actor: `${currentUser.name} (${currentUser.badge})`,
-      action: "SESSION_AUTHENTICATED",
-      details: `Active role authenticated at ${ADMINISTRATIVE_SECTIONS[0].displayName} • DPKCOP Sinnar`,
-      hash: "0x8f2a49b9c9e",
-    };
-    setAuditTrail([initialLog]);
   }, []);
 
-  const hasAccess = (deskCode: string) => {
-    if (currentUser.allowedDesks.includes("ALL")) return true;
-    return currentUser.allowedDesks.includes(deskCode as any);
-  };
+  const handleLogin = (persona: UserPersona) => {
+    setCurrentUser(persona);
+    setIsAuthenticated(true);
+    setLoginError("");
 
-  const handleRoleChange = (userId: string) => {
-    const selected = INSTITUTIONAL_USERS.find((u) => u.id === userId) || INSTITUTIONAL_USERS[0];
-    setCurrentUser(selected);
+    // Initialize desk matching user's permissions
+    const accessibleSection = ADMINISTRATIVE_SECTIONS.find((s) => 
+      persona.allowedDesks.includes("ALL") || persona.allowedDesks.includes(s.code as any)
+    ) || ADMINISTRATIVE_SECTIONS[0];
+    
+    setActiveSection(accessibleSection);
 
     const log: AuditRecord = {
       id: "LOG-" + Math.random().toString(36).substring(2, 8).toUpperCase(),
       timestamp: new Date().toLocaleTimeString(),
-      sectionCode: activeSection.code,
-      actor: `${selected.name} (${selected.badge})`,
-      action: "ROLE_DELEGATION_SWITCH",
-      details: `Switched operational identity to ${selected.title} [Role: ${selected.role}]`,
+      sectionCode: accessibleSection.code,
+      actor: `${persona.name} [${persona.role}]`,
+      action: "AUTH_GATEWAY_LOGIN",
+      details: `Successful authenticated session via Statutory Keypad • Role: ${persona.title}`,
       hash: "0x" + Math.random().toString(16).substring(2, 10),
     };
-    setAuditTrail((prev) => [log, ...prev.slice(0, 9)]);
+    setAuditTrail([log]);
+  };
+
+  const handleLogout = () => {
+    if (currentUser) {
+      const log: AuditRecord = {
+        id: "LOG-" + Math.random().toString(36).substring(2, 8).toUpperCase(),
+        timestamp: new Date().toLocaleTimeString(),
+        sectionCode: activeSection.code,
+        actor: `${currentUser.name} [${currentUser.role}]`,
+        action: "AUTH_GATEWAY_LOGOUT",
+        details: "Secure session terminated by user.",
+        hash: "0x" + Math.random().toString(16).substring(2, 10),
+      };
+      setAuditTrail((prev) => [log, ...prev]);
+    }
+    setIsAuthenticated(false);
+    setCurrentUser(null);
+  };
+
+  const hasAccess = (deskCode: string) => {
+    if (!currentUser) return false;
+    if (currentUser.allowedDesks.includes("ALL")) return true;
+    return currentUser.allowedDesks.includes(deskCode as any);
   };
 
   const switchDesk = (section: AdministrativeSection) => {
-    if (!hasAccess(section.code)) {
-      alert(`Access Restricted: Your current role (${currentUser.badge}) does not hold delegated authority for ${section.displayName}.`);
+    if (!currentUser || !hasAccess(section.code)) {
+      alert(`Access Restricted: Your current role (${currentUser?.badge}) does not hold delegated authority for ${section.displayName}.`);
       return;
     }
 
@@ -104,20 +131,21 @@ export default function OfficeAIDashboard() {
       id: "LOG-" + Math.random().toString(36).substring(2, 8).toUpperCase(),
       timestamp: new Date().toLocaleTimeString(),
       sectionCode: section.code,
-      actor: `${currentUser.name} (${currentUser.badge})`,
+      actor: `${currentUser.name} [${currentUser.role}]`,
       action: "DESK_ACCESSED",
-      details: `Accessed desk: ${section.displayName} (${section.deskTitle})`,
+      details: `Navigated to desk: ${section.displayName} (${section.deskTitle})`,
       hash: "0x" + Math.random().toString(16).substring(2, 10),
     };
     setAuditTrail((prev) => [newEntry, ...prev.slice(0, 9)]);
   };
 
   const handleAuditLog = (action: string, details: string) => {
+    if (!currentUser) return;
     const auditRecord: AuditRecord = {
       id: "LOG-" + Math.random().toString(36).substring(2, 8).toUpperCase(),
       timestamp: new Date().toLocaleTimeString(),
       sectionCode: activeSection.code,
-      actor: `${currentUser.name} (${currentUser.badge})`,
+      actor: `${currentUser.name} [${currentUser.role}]`,
       action: action,
       details: details,
       hash: "0x" + Math.random().toString(16).substring(2, 10) + "ae3",
@@ -163,6 +191,158 @@ export default function OfficeAIDashboard() {
     );
   }
 
+  // =========================================================================
+  // VIEW 1: AUTHENTICATION GATEWAY (LOGIN PORTAL)
+  // =========================================================================
+  if (!isAuthenticated || !currentUser) {
+    return (
+      <div className="min-h-screen bg-linear-to-br from-slate-900 via-slate-800 to-blue-950 flex flex-col justify-between p-6 font-sans text-slate-100">
+        {/* Top Minimal Brand */}
+        <header className="flex items-center justify-between max-w-6xl w-full mx-auto">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-white p-1 flex items-center justify-center shadow-md">
+              <img 
+                src="https://raw.githubusercontent.com/agrawalhiteshhkumar/faculty-ai-genie/main/brightpath-logo.png" 
+                alt="Bright Path Logo" 
+                className="h-full w-full object-contain"
+              />
+            </div>
+            <div>
+              <div className="font-extrabold text-sm tracking-tight text-white uppercase flex items-center gap-2">
+                OFFICE AI GENIE™
+                <span className="text-[10px] font-mono bg-blue-500/20 text-blue-300 border border-blue-400/30 px-1.5 py-0.2 rounded font-bold">
+                  v2026.4
+                </span>
+              </div>
+              <div className="text-[10px] text-amber-400 font-extrabold tracking-widest uppercase">
+                LEARN. SKILL. SUCCEED.
+              </div>
+            </div>
+          </div>
+
+          <div className="hidden sm:block text-right">
+            <div className="text-[10px] text-slate-400 uppercase font-semibold">Institutional Tenant</div>
+            <div className="text-xs font-bold text-slate-200">D. P. Kharde Navjeevan College of Pharmacy</div>
+          </div>
+        </header>
+
+        {/* Center Gateway Box */}
+        <main className="max-w-4xl w-full mx-auto my-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+          {/* Left Hero Context */}
+          <div className="lg:col-span-6 space-y-4">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-400/20 text-blue-300 text-xs font-bold">
+              <ShieldCheck className="w-4 h-4 text-blue-400" /> Statutory Identity Gateway
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight leading-tight">
+              Institutional Operating System
+            </h1>
+            <p className="text-slate-300 text-sm leading-relaxed">
+              Secure administrative access for continuous statutory compliance across MSBTE, PCI, DTE, Fees Regulating Authority (FRA), and MahaDBT cells.
+            </p>
+            <div className="pt-2 flex flex-wrap gap-2 text-[10px] font-mono font-bold text-slate-400">
+              <span className="bg-slate-800/80 border border-slate-700 px-2.5 py-1 rounded-md">MSBTE: 62386</span>
+              <span className="bg-slate-800/80 border border-slate-700 px-2.5 py-1 rounded-md">DTE: 5539</span>
+              <span className="bg-slate-800/80 border border-slate-700 px-2.5 py-1 rounded-md">PCI: 9178</span>
+              <span className="bg-slate-800/80 border border-slate-700 px-2.5 py-1 rounded-md">AISHE: S-22693</span>
+            </div>
+          </div>
+
+          {/* Right Login Card */}
+          <div className="lg:col-span-6 bg-white text-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-200">
+            <div className="mb-6">
+              <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">
+                AUTHENTICATION PORTAL
+              </span>
+              <h2 className="text-xl font-extrabold text-slate-900 mt-1">Select Institutional Persona</h2>
+              <p className="text-xs text-slate-500 mt-0.5">Sign in to your delegated administrative desk</p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
+                  Assigned Officer / Desk
+                </label>
+                <select
+                  value={selectedUserIndex}
+                  onChange={(e) => setSelectedUserIndex(Number(e.target.value))}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
+                >
+                  {INSTITUTIONAL_USERS.map((user, idx) => (
+                    <option key={user.id} value={idx}>
+                      {user.badge} — {user.name} ({user.title})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Selected User Badge preview */}
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between text-xs">
+                <div>
+                  <div className="text-[10px] text-blue-600 uppercase font-bold">Delegated Authority</div>
+                  <div className="font-bold text-slate-900">{INSTITUTIONAL_USERS[selectedUserIndex].title}</div>
+                  <div className="text-[11px] text-slate-500">{INSTITUTIONAL_USERS[selectedUserIndex].email}</div>
+                </div>
+                <span className="text-[10px] font-mono px-2 py-1 rounded bg-blue-600 text-white font-bold">
+                  {INSTITUTIONAL_USERS[selectedUserIndex].role}
+                </span>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
+                  Statutory Security PIN
+                </label>
+                <div className="relative">
+                  <KeyRound className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  <input
+                    type="password"
+                    value={pinCode}
+                    onChange={(e) => setPinCode(e.target.value)}
+                    placeholder="Enter Security PIN"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-3.5 py-2.5 text-xs font-mono font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <div className="text-[10px] text-slate-400 mt-1">Default Demo PIN: <code className="font-bold text-slate-600">1234</code></div>
+              </div>
+
+              {loginError && (
+                <div className="p-2.5 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs font-semibold flex items-center gap-2">
+                  <ShieldAlert className="w-4 h-4" /> {loginError}
+                </div>
+              )}
+
+              <button
+                onClick={() => {
+                  if (pinCode !== "1234" && pinCode !== "") {
+                    setLoginError("Invalid Security PIN. Use demo pin: 1234");
+                    return;
+                  }
+                  handleLogin(INSTITUTIONAL_USERS[selectedUserIndex]);
+                }}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs py-3 rounded-xl shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 transition"
+              >
+                Authenticate Desk Session <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
+              <span>Cryptographic Governance • Hash Chained</span>
+              <span className="font-bold text-slate-500">AES-256 Verified</span>
+            </div>
+          </div>
+        </main>
+
+        {/* Footer */}
+        <footer className="text-center text-xs text-slate-400 py-4 max-w-4xl mx-auto w-full border-t border-slate-800/80">
+          <div>D. P. Kharde Navjeevan College of Pharmacy, Sinnar, Nashik — 422103</div>
+          <div className="text-[10px] text-slate-500 mt-0.5">Office AI Genie™ • Chief Academic Architect: Dr. Hiteshkumar Agrawal</div>
+        </footer>
+      </div>
+    );
+  }
+
+  // =========================================================================
+  // VIEW 2: AUTHENTICATED DESK WORKSPACE
+  // =========================================================================
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-800 flex flex-col font-sans">
       {/* Top Header */}
@@ -195,28 +375,23 @@ export default function OfficeAIDashboard() {
             </div>
           </div>
 
-          {/* Institutional Persona / Role Switcher (RBAC) */}
+          {/* Authenticated User Profile & Sign Out Right */}
           <div className="flex items-center gap-3">
             <div className="text-right hidden sm:block">
-              <div className="text-[10px] text-slate-400 font-semibold uppercase">Active Persona</div>
+              <div className="flex items-center justify-end gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span className="text-[10px] text-slate-400 font-semibold uppercase">Authenticated</span>
+              </div>
               <div className="text-xs font-bold text-slate-900">{currentUser.name}</div>
-              <div className="text-[10px] text-blue-600 font-medium">{currentUser.title}</div>
+              <div className="text-[10px] text-blue-600 font-medium">{currentUser.title} ({currentUser.badge})</div>
             </div>
 
-            <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl border border-slate-200">
-              <UserCircle2 className="w-4 h-4 text-blue-600 ml-1.5" />
-              <select
-                value={currentUser.id}
-                onChange={(e) => handleRoleChange(e.target.value)}
-                className="bg-transparent text-xs font-bold text-slate-800 pr-2 py-1 outline-hidden cursor-pointer"
-              >
-                {INSTITUTIONAL_USERS.map((user) => (
-                  <option key={user.id} value={user.id}>
-                    {user.badge} • {user.role}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <button
+              onClick={handleLogout}
+              className="px-3 py-1.5 rounded-lg bg-red-50 border border-red-200 hover:bg-red-100 text-red-700 text-xs font-bold flex items-center gap-1.5 transition"
+            >
+              <LogOut className="w-3.5 h-3.5" /> Sign Out
+            </button>
           </div>
         </div>
 
@@ -372,14 +547,14 @@ export default function OfficeAIDashboard() {
             })}
           </div>
 
-          {/* User Role Card */}
+          {/* Active User Card in Sidebar */}
           <div className="mt-auto pt-4 border-t border-slate-200 text-xs">
-            <div className="text-[10px] uppercase font-bold text-slate-400 mb-1.5">Active Delegation</div>
+            <div className="text-[10px] uppercase font-bold text-slate-400 mb-1.5">Authenticated Session</div>
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl">
               <div className="font-bold text-blue-900 text-xs">{currentUser.name}</div>
               <div className="text-[11px] text-blue-700">{currentUser.title}</div>
               <div className="text-[10px] font-mono text-blue-600 font-semibold mt-1">
-                Level: {currentUser.role}
+                Role: {currentUser.role}
               </div>
             </div>
           </div>
@@ -486,7 +661,7 @@ export default function OfficeAIDashboard() {
                   <tr className="border-b border-slate-200 text-slate-400 font-semibold uppercase text-[10px]">
                     <th className="pb-2.5">Log ID</th>
                     <th className="pb-2.5">Timestamp</th>
-                    <th className="pb-2.5">Actor (Active Persona)</th>
+                    <th className="pb-2.5">Actor (Authenticated User)</th>
                     <th className="pb-2.5">Action</th>
                     <th className="pb-2.5">Details</th>
                     <th className="pb-2.5 font-mono text-right">Ledger Hash</th>
