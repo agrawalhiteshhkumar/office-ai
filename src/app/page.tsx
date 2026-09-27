@@ -13,6 +13,7 @@ import AIIntelligenceModal from "@/components/AIIntelligenceModal";
 import ExamCellModal from "@/components/ExamCellModal";
 import CadreRosterModal from "@/components/CadreRosterModal";
 import FRAModal from "@/components/FRAModal";
+import StoresModal from "@/components/StoresModal";
 import { 
   Building2, 
   ShieldCheck, 
@@ -27,7 +28,8 @@ import {
   Cpu,
   GraduationCap,
   Users,
-  IndianRupee
+  IndianRupee,
+  Boxes
 } from "lucide-react";
 
 export default function OfficeAIDashboard() {
@@ -43,6 +45,7 @@ export default function OfficeAIDashboard() {
   const [isExamModalOpen, setIsExamModalOpen] = useState(false);
   const [isCadreModalOpen, setIsCadreModalOpen] = useState(false);
   const [isFRAModalOpen, setIsFRAModalOpen] = useState(false);
+  const [isStoresModalOpen, setIsStoresModalOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -107,6 +110,8 @@ export default function OfficeAIDashboard() {
       setIsCadreModalOpen(true);
     } else if (activeSection.code === "ACCOUNTS" || lower.includes("fee") || lower.includes("fra") || lower.includes("ffc") || lower.includes("audit")) {
       setIsFRAModalOpen(true);
+    } else if (activeSection.code === "PHARMACY_STORES" || lower.includes("stock") || lower.includes("chemical") || lower.includes("procure") || lower.includes("dead stock")) {
+      setIsStoresModalOpen(true);
     } else {
       setIsRegisterOpen(true);
     }
@@ -142,6 +147,12 @@ export default function OfficeAIDashboard() {
         </div>
 
         <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => setIsStoresModalOpen(true)}
+            className="px-3 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/30 hover:bg-orange-500/20 text-orange-300 text-xs font-semibold flex items-center gap-1.5 transition"
+          >
+            <Boxes className="w-3.5 h-3.5" /> Stores & Dead Stock
+          </button>
           <button
             onClick={() => setIsFRAModalOpen(true)}
             className="px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 text-amber-300 text-xs font-semibold flex items-center gap-1.5 transition"
@@ -360,6 +371,13 @@ export default function OfficeAIDashboard() {
       <FRAModal
         isOpen={isFRAModalOpen}
         onClose={() => setIsFRAModalOpen(false)}
+        onLogAudit={handleAuditLog}
+      />
+
+      {/* Pharmacy Stores & Dead Stock Modal */}
+      <StoresModal
+        isOpen={isStoresModalOpen}
+        onClose={() => setIsStoresModalOpen(false)}
         onLogAudit={handleAuditLog}
       />
     </div>
