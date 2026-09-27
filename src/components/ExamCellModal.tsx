@@ -1,17 +1,36 @@
 "use client";
 
 import React, { useState } from "react";
-import { INITIAL_STUDENT_MARKS } from "@/data/examData";
 import { generateOfficialReport } from "@/utils/printReport";
 import { 
   X, 
   GraduationCap, 
   AlertTriangle, 
   CheckCircle2, 
-  Printer, 
-  FileSpreadsheet,
-  Award
+  Printer
 } from "lucide-react";
+
+interface StudentMarkRecord {
+  id: string;
+  rollNo: number;
+  enrollmentNo: string;
+  name: string;
+  pharmaceutics: number;
+  pharmacology: number;
+  chemistry: number;
+  pharmacognosy: number;
+  attendancePercent: number;
+  isDetained: boolean;
+}
+
+const DEFAULT_EXAM_MARKS: StudentMarkRecord[] = [
+  { id: "S1", rollNo: 1, enrollmentNo: "230623860001", name: "Aarav Patil", pharmaceutics: 18, pharmacology: 17, chemistry: 16, pharmacognosy: 19, attendancePercent: 88, isDetained: false },
+  { id: "S2", rollNo: 2, enrollmentNo: "230623860002", name: "Ananya Deshmukh", pharmaceutics: 19, pharmacology: 18, chemistry: 19, pharmacognosy: 18, attendancePercent: 94, isDetained: false },
+  { id: "S3", rollNo: 3, enrollmentNo: "230623860003", name: "Rohan Shinde", pharmaceutics: 14, pharmacology: 12, chemistry: 15, pharmacognosy: 13, attendancePercent: 78, isDetained: false },
+  { id: "S4", rollNo: 4, enrollmentNo: "230623860004", name: "Pooja Jadhav", pharmaceutics: 8, pharmacology: 9, chemistry: 7, pharmacognosy: 10, attendancePercent: 62, isDetained: true },
+  { id: "S5", rollNo: 5, enrollmentNo: "230623860005", name: "Aditya Gaikwad", pharmaceutics: 16, pharmacology: 15, chemistry: 17, pharmacognosy: 16, attendancePercent: 84, isDetained: false },
+  { id: "S6", rollNo: 6, enrollmentNo: "230623860006", name: "Neha Kulkarni", pharmaceutics: 11, pharmacology: 10, chemistry: 9, pharmacognosy: 12, attendancePercent: 69, isDetained: true }
+];
 
 export default function ExamCellModal({
   isOpen,
@@ -22,19 +41,18 @@ export default function ExamCellModal({
   onClose: () => void;
   onLogAudit: (action: string, details: string) => void;
 }) {
-  const [students] = useState<any[]>(INITIAL_STUDENT_MARKS);
+  const [students] = useState<StudentMarkRecord[]>(DEFAULT_EXAM_MARKS);
   const [activeTab, setActiveTab] = useState<"ALL" | "ELIGIBLE" | "DETAINED">("ALL");
 
   if (!isOpen) return null;
 
   const totalStudents = students.length;
-  const detainedCount = students.filter((s) => s.isDetained || s.status === "DETAINED").length;
+  const detainedCount = students.filter((s) => s.isDetained).length;
   const eligibleCount = totalStudents - detainedCount;
 
   const filteredStudents = students.filter((s) => {
-    const isDet = Boolean(s.isDetained || s.status === "DETAINED");
-    if (activeTab === "ELIGIBLE") return !isDet;
-    if (activeTab === "DETAINED") return isDet;
+    if (activeTab === "ELIGIBLE") return !s.isDetained;
+    if (activeTab === "DETAINED") return s.isDetained;
     return true;
   });
 
@@ -61,20 +79,17 @@ export default function ExamCellModal({
         "Attendance %",
         "Hall Ticket Status",
       ],
-      dataRows: filteredStudents.map((s) => {
-        const isDet = Boolean(s.isDetained || s.status === "DETAINED");
-        return [
-          s.rollNo || s.id || "-",
-          s.name || s.studentName || "Student",
-          s.enrollmentNo || "2306238600" + (s.rollNo || 1),
-          `${s.pharmaceutics || s.marks?.pharmaceutics || 16}/20`,
-          `${s.pharmacology || s.marks?.pharmacology || 15}/20`,
-          `${s.chemistry || s.marks?.chemistry || 14}/20`,
-          `${s.pharmacognosy || s.marks?.pharmacognosy || 17}/20`,
-          `${s.attendance || s.attendancePercent || 82}%`,
-          isDet ? "DETAINED" : "CLEARED / ELIGIBLE",
-        ];
-      }),
+      dataRows: filteredStudents.map((s) => [
+        s.rollNo,
+        s.name,
+        s.enrollmentNo,
+        `${s.pharmaceutics}/20`,
+        `${s.pharmacology}/20`,
+        `${s.chemistry}/20`,
+        `${s.pharmacognosy}/20`,
+        `${s.attendancePercent}%`,
+        s.isDetained ? "DETAINED" : "CLEARED / ELIGIBLE",
+      ]),
       summaryMetrics: [
         { label: "Total Candidates Registered", value: `${totalStudents} Enrolled` },
         { label: "Hall Tickets Cleared", value: `${eligibleCount} Students` },
@@ -156,53 +171,42 @@ export default function ExamCellModal({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredStudents.map((s, idx) => {
-                const isDet = Boolean(s.isDetained || s.status === "DETAINED");
-                return (
-                  <tr key={s.id || idx} className="hover:bg-slate-50 transition">
-                    <td className="py-3">
-                      <div className="font-bold text-slate-900">{s.name || s.studentName}</div>
-                      <div className="text-[10px] text-slate-400 font-mono">
-                        Roll: {s.rollNo || idx + 1} • Enrolment: {s.enrollmentNo || "2306238600" + (idx + 1)}
-                      </div>
-                    </td>
-                    <td className="py-3 text-center font-mono text-slate-700">
-                      {s.pharmaceutics || s.marks?.pharmaceutics || 16}/20
-                    </td>
-                    <td className="py-3 text-center font-mono text-slate-700">
-                      {s.pharmacology || s.marks?.pharmacology || 15}/20
-                    </td>
-                    <td className="py-3 text-center font-mono text-slate-700">
-                      {s.chemistry || s.marks?.chemistry || 14}/20
-                    </td>
-                    <td className="py-3 text-center font-mono text-slate-700">
-                      {s.pharmacognosy || s.marks?.pharmacognosy || 17}/20
-                    </td>
-                    <td className="py-3 text-center">
-                      <span
-                        className={`font-bold font-mono ${
-                          (s.attendance || s.attendancePercent || 80) < 75
-                            ? "text-red-600 bg-red-50 px-1.5 py-0.5 rounded border border-red-200"
-                            : "text-emerald-700"
-                        }`}
-                      >
-                        {s.attendance || s.attendancePercent || 80}%
+              {filteredStudents.map((s) => (
+                <tr key={s.id} className="hover:bg-slate-50 transition">
+                  <td className="py-3">
+                    <div className="font-bold text-slate-900">{s.name}</div>
+                    <div className="text-[10px] text-slate-400 font-mono">
+                      Roll: {s.rollNo} • Enrolment: {s.enrollmentNo}
+                    </div>
+                  </td>
+                  <td className="py-3 text-center font-mono text-slate-700">{s.pharmaceutics}/20</td>
+                  <td className="py-3 text-center font-mono text-slate-700">{s.pharmacology}/20</td>
+                  <td className="py-3 text-center font-mono text-slate-700">{s.chemistry}/20</td>
+                  <td className="py-3 text-center font-mono text-slate-700">{s.pharmacognosy}/20</td>
+                  <td className="py-3 text-center">
+                    <span
+                      className={`font-bold font-mono ${
+                        s.attendancePercent < 75
+                          ? "text-red-600 bg-red-50 px-1.5 py-0.5 rounded border border-red-200"
+                          : "text-emerald-700"
+                      }`}
+                    >
+                      {s.attendancePercent}%
+                    </span>
+                  </td>
+                  <td className="py-3 text-right">
+                    {s.isDetained ? (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-red-50 text-red-700 border border-red-200 inline-flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3 text-red-600" /> Detained
                       </span>
-                    </td>
-                    <td className="py-3 text-right">
-                      {isDet ? (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-red-50 text-red-700 border border-red-200 inline-flex items-center gap-1">
-                          <AlertTriangle className="w-3 h-3 text-red-600" /> Detained
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Eligible
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+                    ) : (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Eligible
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
