@@ -34,8 +34,7 @@ import {
   UserCheck,
   Crown,
   Mail,
-  Phone,
-  ShieldAlert
+  Phone
 } from "lucide-react";
 
 export default function OfficeAIDashboard() {
@@ -138,10 +137,14 @@ export default function OfficeAIDashboard() {
       {/* Top Header - Matching Faculty AI Genie */}
       <header className="border-b border-slate-200 bg-white sticky top-0 z-40 px-6 py-3 shadow-xs">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          {/* Brand Left */}
+          {/* Brand Left with Bright Path Logo */}
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 font-black text-sm shadow-xs">
-              BP
+            <div className="h-11 w-11 rounded-xl bg-white border border-slate-200 p-1 flex items-center justify-center shadow-xs overflow-hidden">
+              <img 
+                src="https://raw.githubusercontent.com/agrawalhiteshhkumar/faculty-ai-genie/main/brightpath-logo.png" 
+                alt="Bright Path Logo" 
+                className="h-full w-full object-contain"
+              />
             </div>
             <div>
               <div className="flex items-center gap-2">
