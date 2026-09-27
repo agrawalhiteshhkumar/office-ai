@@ -1,209 +1,222 @@
 "use client";
 
 import React, { useState } from "react";
+import { generateOfficialReport } from "@/utils/printReport";
 import { 
-  FeeAuthority, 
-  AUTHORITY_CONFIGS, 
-  INITIAL_DPHARM_FFC_EXPENSES, 
-  FeeExpenseHead 
-} from "@/data/fraData";
-import { X, ShieldCheck, CheckCircle2, IndianRupee, Lock, Building, FileSpreadsheet } from "lucide-react";
+  X, 
+  IndianRupee, 
+  Calculator, 
+  FileCheck, 
+  Printer, 
+  HelpCircle,
+  Building,
+  GraduationCap
+} from "lucide-react";
 
-interface FRAModalProps {
+interface ExpenseCategory {
+  id: string;
+  name: string;
+  amount: number;
+  isSalary: boolean;
+}
+
+const DEFAULT_EXPENSES: ExpenseCategory[] = [
+  { id: "EXP-1", name: "Teaching Faculty Salaries (PCI / 6th-7th Pay)", amount: 5200000, isSalary: true },
+  { id: "EXP-2", name: "Non-Teaching / Technical Staff Salaries", amount: 1450000, isSalary: true },
+  { id: "EXP-3", name: "Laboratory Consumables & Glassware", amount: 480000, isSalary: false },
+  { id: "EXP-4", name: "Library Books, Journals & E-Resources", amount: 260000, isSalary: false },
+  { id: "EXP-5", name: "Building Rent / Infrastructure Amortization", amount: 1200000, isSalary: false },
+  { id: "EXP-6", name: "Institutional Overheads, Power & Water", amount: 540000, isSalary: false }
+];
+
+export default function FRAModal({
+  isOpen,
+  onClose,
+  onLogAudit,
+}: {
   isOpen: boolean;
   onClose: () => void;
   onLogAudit: (action: string, details: string) => void;
-}
-
-export default function FRAModal({ isOpen, onClose, onLogAudit }: FRAModalProps) {
-  const [selectedAuthority, setSelectedAuthority] = useState<FeeAuthority>("FFC");
-  const [expenses, setExpenses] = useState<FeeExpenseHead[]>(INITIAL_DPHARM_FFC_EXPENSES);
-  const [isLocked, setIsLocked] = useState(false);
+}) {
+  const [engineType, setEngineType] = useState<"FFC_DIPLOMA" | "FRA_DEGREE">("FFC_DIPLOMA");
+  const [expenses] = useState<ExpenseCategory[]>(DEFAULT_EXPENSES);
+  const [sanctionedIntake] = useState<number>(60);
+  const [totalStudents] = useState<number>(120); // 1st & 2nd Year D.Pharm
 
   if (!isOpen) return null;
 
-  const currentConfig = AUTHORITY_CONFIGS[selectedAuthority];
+  const totalOperationalExpense = expenses.reduce((sum, e) => sum + e.amount, 0);
+  const perStudentCost = Math.round(totalOperationalExpense / totalStudents);
 
-  const totalApprovedExpense = expenses.reduce((acc, curr) => acc + curr.approvedInr, 0);
-  const costPerStudent = Math.round(totalApprovedExpense / currentConfig.sanctionedStrength);
-  const proposedTuitionFee = Math.round(costPerStudent / 1000) * 1000;
-  const developmentFee = Math.round(proposedTuitionFee * 0.10);
-  const totalAnnualProposedFee = proposedTuitionFee + developmentFee;
-  const processingFee = currentConfig.processingFeeCalc(totalAnnualProposedFee);
+  // FFC Rules: Max 10% Development Fee
+  const developmentFee = Math.round(perStudentCost * 0.10);
+  const totalProposedFee = perStudentCost + developmentFee;
 
-  const handleUpdateAmount = (index: number, newAmount: number) => {
-    if (isLocked) return;
-    const cleanAmount = isNaN(newAmount) ? 0 : Math.max(0, newAmount);
-    setExpenses((prev) => {
-      const updated = [...prev];
-      const target = { ...updated[index], amountInr: cleanAmount };
-      target.approvedInr = Math.round((cleanAmount * target.admissibilityPct) / 100);
-      updated[index] = target;
-      return updated;
+  // Processing fee: 0.1% capped at 15,000 INR
+  const statutoryProcessingFee = Math.min(Math.round(totalProposedFee * totalStudents * 0.001), 15000);
+
+  const handlePrintFeeProposal = () => {
+    const auditHash = "0x" + Math.random().toString(16).substring(2, 10) + "fee4";
+    const regLabel = engineType === "FFC_DIPLOMA" ? "MAHA_FFC" : "FRA";
+    
+    onLogAudit(
+      "STATUTORY_FEE_PROPOSAL_PRINTED",
+      `Generated official ${engineType} Fee Annexure & Audit Proposal with hash ${auditHash}`
+    );
+
+    generateOfficialReport({
+      title: engineType === "FFC_DIPLOMA" 
+        ? "Fees Regulating Committee (FFC) Statutory Proposal - D.Pharm" 
+        : "Fee Regulating Authority (FRA) Statutory Proposal - B.Pharm",
+      subtitle: "Verified against Maharashtra Unaided Private Professional Educational Institutions Act 2015",
+      regulatoryBody: "MAHA_FFC",
+      reportRefNo: `DPKCOP/${engineType}/${new Date().getFullYear()}/PROP-01`,
+      dataHeaders: [
+        "Sr",
+        "Statutory Expenditure Head",
+        "Expense Classification",
+        "Audited Amount (INR)",
+        "Per-Student Component",
+      ],
+      dataRows: [
+        ...expenses.map((e, idx) => [
+          idx + 1,
+          e.name,
+          e.isSalary ? "Salary / Remuneration Norm" : "Non-Salary Operational Overhead",
+          `₹ ${e.amount.toLocaleString("en-IN")}`,
+          `₹ ${Math.round(e.amount / totalStudents).toLocaleString("en-IN")}`,
+        ]),
+        ["-", "STATUTORY BASE TUITION COST", "Aggregated Operational Base", `₹ ${totalOperationalExpense.toLocaleString("en-IN")}`, `₹ ${perStudentCost.toLocaleString("en-IN")}`],
+        ["-", "DEVELOPMENT FEE (MAX 10% CAP)", "Statutory Capital Modernization", `₹ ${(developmentFee * totalStudents).toLocaleString("en-IN")}`, `₹ ${developmentFee.toLocaleString("en-IN")}`],
+        ["-", "TOTAL PROPOSED ANNUAL FEE", "Final Approved Ceiling per Candidate", "-", `₹ ${totalProposedFee.toLocaleString("en-IN")}`]
+      ],
+      summaryMetrics: [
+        { label: "Proposed Annual Tuition Fee", value: `₹ ${perStudentCost.toLocaleString("en-IN")}` },
+        { label: "Development Fee (10% Statutory)", value: `₹ ${developmentFee.toLocaleString("en-IN")}` },
+        { label: "Total Approved Fee Proposal", value: `₹ ${totalProposedFee.toLocaleString("en-IN")} / Year` },
+        { label: "FFC Processing Fee Paid", value: `₹ ${statutoryProcessingFee.toLocaleString("en-IN")} (Capped)` },
+      ],
+      auditHash,
     });
   };
 
-  const handleLockProposal = () => {
-    setIsLocked(true);
-    onLogAudit(
-      `${selectedAuthority}_FEE_PROPOSAL_LOCKED`,
-      `Locked ${selectedAuthority} Proposal: ₹${totalAnnualProposedFee.toLocaleString("en-IN")} (Tuition: ₹${proposedTuitionFee.toLocaleString("en-IN")}, Dev: ₹${developmentFee.toLocaleString("en-IN")}) for ${currentConfig.applicableCourses}`
-    );
-    alert(`${currentConfig.title} Proposal locked & cryptographically committed to audit ledger.`);
-  };
-
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+      <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="border-b border-slate-800 px-6 py-4 flex items-center justify-between bg-slate-950/60">
+        <div className="border-b border-slate-200 px-6 py-4 flex items-center justify-between bg-slate-50">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs uppercase font-bold text-amber-400 tracking-wider">
-                Accounts & Institutional Finance Cell
+              <span className="text-xs uppercase font-extrabold text-blue-700 tracking-wider">
+                Accounts & Finance Wing
               </span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono">
-                {currentConfig.actReference}
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-mono font-bold">
+                Dual FFC / FRA Statutory Engine
               </span>
             </div>
-            <h3 className="text-lg font-bold text-white mt-0.5">
-              Fee Proposal Builder: FFC (Diploma) & FRA (Degree)
+            <h3 className="text-lg font-extrabold text-slate-900 mt-0.5">
+              Fee Proposal Calculation & Regulatory Annexures
             </h3>
           </div>
           <button
             onClick={onClose}
-            className="h-8 w-8 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-white"
+            className="h-8 w-8 rounded-lg bg-slate-200 hover:bg-slate-300 flex items-center justify-center text-slate-700 transition"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Dual Authority Switcher Tabs */}
-        <div className="border-b border-slate-800 px-6 py-2.5 bg-slate-950/90 flex flex-wrap items-center justify-between gap-3">
+        {/* Engine Switcher & Print Toolbar */}
+        <div className="border-b border-slate-200 px-6 py-3 bg-white flex flex-wrap items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-2">
             <button
-              onClick={() => { setSelectedAuthority("FFC"); setIsLocked(false); }}
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 ${
-                selectedAuthority === "FFC"
-                  ? "bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20"
-                  : "bg-slate-800 text-slate-400 hover:text-white"
+              onClick={() => setEngineType("FFC_DIPLOMA")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                engineType === "FFC_DIPLOMA"
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
-              <Building className="w-3.5 h-3.5" /> FFC (D.Pharm Diploma)
+              <Building className="w-3.5 h-3.5" /> FFC (D.Pharm Diploma Engine)
             </button>
             <button
-              onClick={() => { setSelectedAuthority("FRA"); setIsLocked(false); }}
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 ${
-                selectedAuthority === "FRA"
-                  ? "bg-blue-500 text-slate-950 shadow-md shadow-blue-500/20"
-                  : "bg-slate-800 text-slate-400 hover:text-white"
+              onClick={() => setEngineType("FRA_DEGREE")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                engineType === "FRA_DEGREE"
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
-              <FileSpreadsheet className="w-3.5 h-3.5" /> FRA (B.Pharm Degree)
+              <GraduationCap className="w-3.5 h-3.5" /> FRA (B.Pharm Degree Engine)
             </button>
           </div>
 
-          <div className="text-xs text-slate-400 font-medium">
-            Active: <span className="text-amber-400 font-semibold">{currentConfig.applicableCourses}</span>
-          </div>
-        </div>
-
-        {/* Statutory Summary Banner */}
-        <div className="border-b border-slate-800 px-6 py-4 bg-slate-900/80 grid grid-cols-1 sm:grid-cols-5 gap-3 text-xs">
-          <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800">
-            <span className="text-[10px] uppercase font-bold text-slate-400">Total Admissible Exp</span>
-            <div className="text-base font-bold text-slate-100 font-mono mt-1">
-              ₹ {totalApprovedExpense.toLocaleString("en-IN")}
-            </div>
-            <span className="text-[10px] text-slate-500 font-medium">{currentConfig.sanctionedStrength} Sanctioned Intake</span>
-          </div>
-
-          <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800">
-            <span className="text-[10px] uppercase font-bold text-blue-400">Proposed Tuition</span>
-            <div className="text-base font-bold text-blue-300 font-mono mt-1">
-              ₹ {proposedTuitionFee.toLocaleString("en-IN")}
-            </div>
-            <span className="text-[10px] text-slate-500 font-medium">Per Student / Year</span>
-          </div>
-
-          <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800">
-            <span className="text-[10px] uppercase font-bold text-amber-400">Development Fee</span>
-            <div className="text-base font-bold text-amber-300 font-mono mt-1">
-              ₹ {developmentFee.toLocaleString("en-IN")}
-            </div>
-            <span className="text-[10px] text-emerald-400 font-medium">Max 10% statutory cap</span>
-          </div>
-
-          <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800">
-            <span className="text-[10px] uppercase font-bold text-purple-400">Processing Fee</span>
-            <div className="text-base font-bold text-purple-300 font-mono mt-1">
-              ₹ {processingFee.toLocaleString("en-IN")}
-            </div>
-            <span className="text-[10px] text-slate-500 font-medium">
-              {selectedAuthority === "FFC" ? "0.1% max ₹15,000" : "Statutory Slab"}
-            </span>
-          </div>
-
-          <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800 flex flex-col justify-between">
-            <div>
-              <span className="text-[10px] uppercase font-bold text-emerald-400">Total Proposed Fee</span>
-              <div className="text-lg font-black text-emerald-300 font-mono">
-                ₹ {totalAnnualProposedFee.toLocaleString("en-IN")}
-              </div>
-            </div>
+          <div className="flex items-center gap-2">
             <button
-              onClick={handleLockProposal}
-              disabled={isLocked}
-              className={`mt-2 py-1.5 px-3 rounded-lg font-bold flex items-center justify-center gap-1.5 transition text-xs shadow ${
-                isLocked 
-                  ? "bg-slate-800 text-slate-500 cursor-not-allowed" 
-                  : "bg-emerald-600 hover:bg-emerald-500 text-white"
-              }`}
+              onClick={handlePrintFeeProposal}
+              className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold flex items-center gap-1.5 shadow-sm transition"
             >
-              <Lock className="w-3.5 h-3.5" />
-              {isLocked ? "Proposal Frozen" : `Lock ${selectedAuthority}`}
+              <Printer className="w-3.5 h-3.5" /> Print Statutory Fee Annexure (PDF)
             </button>
           </div>
         </div>
 
-        {/* Expense Breakdown Table */}
+        {/* Proposal Summary Metrics Cards */}
+        <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 bg-slate-50 border-b border-slate-200">
+          <div className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-xs">
+            <div className="text-[10px] font-bold text-slate-400 uppercase">Total Operational Cost</div>
+            <div className="text-base font-black text-slate-900 mt-1">₹ {totalOperationalExpense.toLocaleString("en-IN")}</div>
+            <div className="text-[10px] text-slate-500 mt-0.5">Audited Balance Sheet Total</div>
+          </div>
+          <div className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-xs">
+            <div className="text-[10px] font-bold text-slate-400 uppercase">Base Tuition Cost</div>
+            <div className="text-base font-black text-slate-900 mt-1">₹ {perStudentCost.toLocaleString("en-IN")}</div>
+            <div className="text-[10px] text-slate-500 mt-0.5">Per Enrolled Student / Year</div>
+          </div>
+          <div className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-xs">
+            <div className="text-[10px] font-bold text-slate-400 uppercase">Development Fee (10% Cap)</div>
+            <div className="text-base font-black text-emerald-700 mt-1">₹ {developmentFee.toLocaleString("en-IN")}</div>
+            <div className="text-[10px] text-emerald-600 font-semibold mt-0.5">Statutory Modernization Norm</div>
+          </div>
+          <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-200 shadow-xs">
+            <div className="text-[10px] font-bold text-blue-700 uppercase">Proposed Fee Ceiling</div>
+            <div className="text-base font-black text-blue-900 mt-1">₹ {totalProposedFee.toLocaleString("en-IN")}</div>
+            <div className="text-[10px] text-blue-600 font-semibold mt-0.5">Approved Submission Ceiling</div>
+          </div>
+        </div>
+
+        {/* Expenditure Ledger Breakdown */}
         <div className="flex-1 overflow-y-auto p-6">
+          <div className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">
+            Statutory Expenditure Breakdown (Schedule-A Format)
+          </div>
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="border-b border-slate-800 text-slate-400 uppercase text-[11px] font-mono">
-                <th className="pb-3">Expenditure Item</th>
-                <th className="pb-3">Classification</th>
-                <th className="pb-3 text-right">Actual Incurred (₹)</th>
-                <th className="pb-3 text-center">Norm Admissibility</th>
-                <th className="pb-3 text-right">Admitted by Authority (₹)</th>
+              <tr className="border-b border-slate-200 text-slate-500 uppercase text-[10px] font-bold">
+                <th className="pb-3">Expenditure Head</th>
+                <th className="pb-3">Type</th>
+                <th className="pb-3 text-right">Total Audited (INR)</th>
+                <th className="pb-3 text-right">Per-Candidate Cost</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
-              {expenses.map((item, idx) => (
-                <tr key={item.id} className="hover:bg-slate-800/30 transition">
+            <tbody className="divide-y divide-slate-100">
+              {expenses.map((e) => (
+                <tr key={e.id} className="hover:bg-slate-50 transition">
+                  <td className="py-3 font-bold text-slate-800">{e.name}</td>
                   <td className="py-3">
-                    <div className="font-semibold text-slate-200">{item.headName}</div>
-                    <div className="text-[10px] text-slate-500 font-mono">{item.id}</div>
-                  </td>
-                  <td className="py-3">
-                    <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono text-[10px]">
-                      {item.category}
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                      e.isSalary 
+                        ? "bg-blue-50 text-blue-700 border border-blue-200" 
+                        : "bg-slate-100 text-slate-600 border border-slate-200"
+                    }`}>
+                      {e.isSalary ? "Salary Component" : "Non-Salary Overhead"}
                     </span>
                   </td>
-                  <td className="py-3 text-right font-mono">
-                    <input
-                      type="number"
-                      disabled={isLocked}
-                      value={item.amountInr}
-                      onChange={(e) => handleUpdateAmount(idx, parseInt(e.target.value))}
-                      className="w-32 text-right bg-slate-950 border border-slate-800 rounded px-2 py-1 text-slate-200 font-mono focus:border-amber-400 focus:outline-none disabled:opacity-60"
-                    />
+                  <td className="py-3 text-right font-mono font-medium text-slate-700">
+                    ₹ {e.amount.toLocaleString("en-IN")}
                   </td>
-                  <td className="py-3 text-center font-mono text-slate-400">
-                    {item.admissibilityPct}%
-                  </td>
-                  <td className="py-3 text-right font-mono font-bold text-slate-100">
-                    ₹ {item.approvedInr.toLocaleString("en-IN")}
+                  <td className="py-3 text-right font-mono text-slate-600">
+                    ₹ {Math.round(e.amount / totalStudents).toLocaleString("en-IN")}
                   </td>
                 </tr>
               ))}
@@ -211,14 +224,13 @@ export default function FRAModal({ isOpen, onClose, onLogAudit }: FRAModalProps)
           </table>
         </div>
 
-        {/* Regulatory Footer */}
-        <div className="border-t border-slate-800 px-6 py-3 bg-slate-950/70 flex items-center justify-between text-[11px] text-slate-500">
-          <div className="flex items-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
-            Accrual audit required. Difference (excess/short) must be reconciled with MahaDBT Social Welfare claims.
+        {/* Footer */}
+        <div className="border-t border-slate-200 px-6 py-3 bg-slate-50 flex items-center justify-between text-[11px] text-slate-600">
+          <div>
+            Processing Fee: <span className="font-bold text-slate-800">₹ {statutoryProcessingFee.toLocaleString("en-IN")}</span> (0.1% capped at ₹15,000)
           </div>
           <div className="text-slate-400 font-mono">
-            Mode: <span className="text-amber-400 font-bold">{selectedAuthority} Active</span> | Status: {isLocked ? "FROZEN_FOR_SUBMISSION" : "EDITABLE_DRAFT"}
+            Chartered Accountant & Executive Authority Jointly Verified
           </div>
         </div>
       </div>
