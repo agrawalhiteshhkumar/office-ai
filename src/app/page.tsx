@@ -28,9 +28,10 @@ import {
   IndianRupee, 
   UserCheck, 
   BookOpen, 
-  Printer, 
   ShieldAlert,
-  Trash2
+  Key,
+  BadgeCheck,
+  Building
 } from "lucide-react";
 
 export default function OfficeAIEngine() {
@@ -45,10 +46,19 @@ export default function OfficeAIEngine() {
   const [sessionTenant, setSessionTenant] = useState<InstituteTenant | null>(null);
   const [isSuperAdminSession, setIsSuperAdminSession] = useState(false);
 
+  // 3 Distinct Gateway Tabs
+  const [portalTab, setPortalTab] = useState<"OFFICER_LOGIN" | "PRINCIPAL_LOGIN" | "SUPER_ADMIN">("OFFICER_LOGIN");
+  
   // Login Form States
-  const [portalMode, setPortalMode] = useState<"STAFF_LOGIN" | "SUPER_ADMIN">("STAFF_LOGIN");
-  const [loginEmail, setLoginEmail] = useState("");
-  const [loginPin, setLoginPin] = useState("");
+  const [officerEmail, setOfficerEmail] = useState("");
+  const [officerPin, setOfficerPin] = useState("");
+
+  const [principalEmail, setPrincipalEmail] = useState("");
+  const [principalLicenseOrPin, setPrincipalLicenseOrPin] = useState("");
+
+  const [superAdminEmail, setSuperAdminEmail] = useState("");
+  const [superAdminPin, setSuperAdminPin] = useState("");
+
   const [authError, setAuthError] = useState("");
 
   // Super Admin Tenant Creator Form
@@ -61,7 +71,7 @@ export default function OfficeAIEngine() {
   const [newDte, setNewDte] = useState("");
   const [newPci, setNewPci] = useState("");
   const [newAishe, setNewAishe] = useState("");
-  const [generatedKeyNotice, setGeneratedKeyNotice] = useState("");
+  const [generatedKeyNotice, setGeneratedKeyNotice] = useState<{ key: string; name: string; email: string } | null>(null);
 
   // Institute Admin: Role Creator Form State
   const [newStaffName, setNewStaffName] = useState("");
@@ -106,8 +116,8 @@ export default function OfficeAIEngine() {
 
   // 1. Super Admin: Provision Tenant & Generate Key
   const handleCreateTenant = () => {
-    if (!newInstName || !newPrincipalEmail) {
-      alert("Institute Name and Principal Email are required.");
+    if (!newInstName.trim() || !newPrincipalEmail.trim()) {
+      alert("College Legal Name and Principal Email are mandatory.");
       return;
     }
 
@@ -116,22 +126,22 @@ export default function OfficeAIEngine() {
 
     const newTenant: InstituteTenant = {
       id: "TENANT-" + Date.now(),
-      name: newInstName,
-      trustName: newTrustName,
-      location: newLocation,
+      name: newInstName.trim(),
+      trustName: newTrustName.trim(),
+      location: newLocation.trim(),
       licenseKey: licenseKey,
-      msbteCode: newMsbte,
-      dteCode: newDte,
-      pciCode: newPci,
-      aisheCode: newAishe,
+      msbteCode: newMsbte.trim(),
+      dteCode: newDte.trim(),
+      pciCode: newPci.trim(),
+      aisheCode: newAishe.trim(),
       createdAt: new Date().toLocaleDateString("en-IN"),
-      principalName: newPrincipal || "Principal",
-      principalEmail: newPrincipalEmail,
+      principalName: newPrincipal.trim() || "Principal",
+      principalEmail: newPrincipalEmail.trim(),
     };
 
-    // Automatically create the Institute Admin user
+    // Provision Principal (Institute Admin) user
     const principalUser: InstitutionalUser = {
-      id: "USR-" + Date.now(),
+      id: "USR-PRIN-" + Date.now(),
       instituteId: newTenant.id,
       name: newTenant.principalName,
       email: newTenant.principalEmail,
@@ -147,8 +157,12 @@ export default function OfficeAIEngine() {
     saveTenants(updatedTenants);
     saveUsers(updatedUsers);
 
-    setGeneratedKeyNotice(licenseKey);
-    // Reset inputs
+    setGeneratedKeyNotice({
+      key: licenseKey,
+      name: newTenant.name,
+      email: newTenant.principalEmail,
+    });
+
     setNewInstName("");
     setNewTrustName("");
     setNewLocation("");
@@ -162,60 +176,109 @@ export default function OfficeAIEngine() {
 
   // 2. Institute Admin: Create Staff / Officer Roles
   const handleCreateRole = () => {
-    if (!sessionTenant || !newStaffName || !newStaffEmail || !newStaffPin) {
+    if (!sessionTenant || !newStaffName.trim() || !newStaffEmail.trim() || !newStaffPin.trim()) {
       alert("Name, email, and access PIN are mandatory.");
       return;
     }
 
     const newUser: InstitutionalUser = {
-      id: "USR-" + Date.now(),
+      id: "USR-STAFF-" + Date.now(),
       instituteId: sessionTenant.id,
-      name: newStaffName,
-      email: newStaffEmail,
+      name: newStaffName.trim(),
+      email: newStaffEmail.trim(),
       role: "OFFICER_DESK",
-      designationTitle: newStaffDesignation || "Desk Officer",
-      accessPin: newStaffPin,
+      designationTitle: newStaffDesignation.trim() || "Desk Officer",
+      accessPin: newStaffPin.trim(),
       allowedDesks: [selectedDeskScope],
     };
 
     const updated = [...users, newUser];
     saveUsers(updated);
 
+    const log = {
+      id: "LOG-" + Math.random().toString(16).substring(2, 8).toUpperCase(),
+      timestamp: new Date().toLocaleTimeString(),
+      actor: `${sessionUser?.name} (Principal)`,
+      action: "ROLE_DELEGATION_ISSUED",
+      details: `Created officer account for ${newUser.name} [Scope: ${selectedDeskScope}]`,
+      hash: "0x" + Math.random().toString(16).substring(2, 10),
+    };
+    setAuditLedger((prev) => [log, ...prev]);
+
     setNewStaffName("");
     setNewStaffEmail("");
     setNewStaffDesignation("");
     setNewStaffPin("");
-    alert(`Officer account created successfully for ${newUser.name}. PIN: ${newUser.accessPin}`);
+    alert(`Desk Officer created! Email: ${newUser.email}, PIN: ${newUser.accessPin}`);
   };
 
-  // 3. Login Handlers
-  const handleStaffLogin = () => {
+  // 3. Login 1: Desk Officer (Created by Principal)
+  const handleOfficerLogin = () => {
     setAuthError("");
     const matchedUser = users.find(
-      (u) => u.email.toLowerCase().trim() === loginEmail.toLowerCase().trim() && u.accessPin === loginPin
+      (u) => 
+        u.role === "OFFICER_DESK" &&
+        u.email.toLowerCase().trim() === officerEmail.toLowerCase().trim() && 
+        u.accessPin === officerPin.trim()
     );
 
     if (!matchedUser) {
-      setAuthError("No matching credentials found. Verify email and PIN.");
+      setAuthError("Invalid Officer credentials. Make sure your role has been created by the Principal.");
       return;
     }
 
     const tenant = tenants.find((t) => t.id === matchedUser.instituteId);
     if (!tenant) {
-      setAuthError("Associated institute tenant not found.");
+      setAuthError("Parent institute tenant not found.");
       return;
     }
 
     setSessionUser(matchedUser);
     setSessionTenant(tenant);
     setIsSuperAdminSession(false);
+    setActiveDesk(matchedUser.allowedDesks[0] || "OVERVIEW");
   };
 
+  // 4. Login 2: Principal / Institute Admin
+  const handlePrincipalLogin = () => {
+    setAuthError("");
+    const cleanEmail = principalEmail.toLowerCase().trim();
+    const cleanSecret = principalLicenseOrPin.trim();
+
+    const matchedPrincipal = users.find(
+      (u) => 
+        u.role === "INSTITUTE_ADMIN" &&
+        u.email.toLowerCase().trim() === cleanEmail
+    );
+
+    if (!matchedPrincipal) {
+      setAuthError("No Institute Admin account found for this email.");
+      return;
+    }
+
+    const tenant = tenants.find((t) => t.id === matchedPrincipal.instituteId);
+    if (!tenant) {
+      setAuthError("Institute tenant not found.");
+      return;
+    }
+
+    // Accepts either default PIN (1234) or the generated cryptographic license key
+    if (matchedPrincipal.accessPin === cleanSecret || tenant.licenseKey === cleanSecret) {
+      setSessionUser(matchedPrincipal);
+      setSessionTenant(tenant);
+      setIsSuperAdminSession(false);
+      setActiveDesk("OVERVIEW");
+    } else {
+      setAuthError("Invalid PIN or License Key for this Principal account.");
+    }
+  };
+
+  // 5. Login 3: Super Admin (Platform Owner)
   const handleSuperAdminLogin = () => {
     setAuthError("");
     if (
-      loginEmail.trim() === SUPER_ADMIN_CREDENTIALS.email &&
-      loginPin.trim() === SUPER_ADMIN_CREDENTIALS.masterPin
+      superAdminEmail.trim().toLowerCase() === SUPER_ADMIN_CREDENTIALS.email.toLowerCase() &&
+      superAdminPin.trim() === SUPER_ADMIN_CREDENTIALS.masterPin
     ) {
       setIsSuperAdminSession(true);
       setSessionUser({
@@ -237,12 +300,16 @@ export default function OfficeAIEngine() {
     setSessionUser(null);
     setSessionTenant(null);
     setIsSuperAdminSession(false);
-    setLoginEmail("");
-    setLoginPin("");
+    setOfficerEmail("");
+    setOfficerPin("");
+    setPrincipalEmail("");
+    setPrincipalLicenseOrPin("");
+    setSuperAdminEmail("");
+    setSuperAdminPin("");
     setAuthError("");
   };
 
-  // Record creator for blank registers
+  // Blank record creator
   const handleAddBlankRecord = () => {
     if (!entryField1) return;
     const newRecord = {
@@ -259,8 +326,8 @@ export default function OfficeAIEngine() {
       id: "LOG-" + Math.random().toString(16).substring(2, 8).toUpperCase(),
       timestamp: new Date().toLocaleTimeString(),
       actor: `${sessionUser?.name} (${sessionUser?.designationTitle})`,
-      action: "RECORD_CREATED",
-      details: `Created entry: ${entryField1}`,
+      action: "STATUTORY_ENTRY_SAVED",
+      details: `Added ${entryField1} in ${activeDesk}`,
       hash: "0x" + Math.random().toString(16).substring(2, 10),
     };
     setAuditLedger([log, ...auditLedger]);
@@ -274,12 +341,12 @@ export default function OfficeAIEngine() {
   if (!mounted) return null;
 
   // =========================================================================
-  // VIEW 1: AUTHENTICATION / PROVISIONING GATEWAY
+  // VIEW 1: AUTHENTICATION GATEWAY (3 DISTINCT LOGINS)
   // =========================================================================
   if (!sessionUser) {
     return (
-      <div className="min-h-screen bg-slate-900 text-white flex flex-col justify-between p-6">
-        <header className="max-w-6xl w-full mx-auto flex items-center justify-between">
+      <div className="min-h-screen bg-slate-950 text-white flex flex-col justify-between p-6 font-sans">
+        <header className="max-w-5xl w-full mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-white p-1 flex items-center justify-center">
               <img 
@@ -296,41 +363,53 @@ export default function OfficeAIEngine() {
           <span className="text-xs text-slate-400 font-mono">v2026.4 Multi-Tenant Engine</span>
         </header>
 
-        <main className="max-w-md w-full mx-auto my-8 bg-white text-slate-900 rounded-3xl p-8 shadow-2xl">
-          {/* Gateway Tabs */}
-          <div className="flex border-b border-slate-200 mb-6 text-xs font-bold">
+        <main className="max-w-lg w-full mx-auto my-6 bg-white text-slate-900 rounded-3xl p-6 sm:p-8 shadow-2xl">
+          {/* 3 Distinct Gateway Tabs */}
+          <div className="grid grid-cols-3 border-b border-slate-200 mb-6 text-xs font-bold text-center">
             <button
-              onClick={() => { setPortalMode("STAFF_LOGIN"); setAuthError(""); }}
-              className={`flex-1 pb-3 text-center border-b-2 transition ${
-                portalMode === "STAFF_LOGIN" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400"
+              onClick={() => { setPortalTab("OFFICER_LOGIN"); setAuthError(""); }}
+              className={`pb-3 border-b-2 transition ${
+                portalTab === "OFFICER_LOGIN" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400 hover:text-slate-600"
               }`}
             >
-              Desk Login
+              Desk Officer
             </button>
             <button
-              onClick={() => { setPortalMode("SUPER_ADMIN"); setAuthError(""); }}
-              className={`flex-1 pb-3 text-center border-b-2 transition ${
-                portalMode === "SUPER_ADMIN" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400"
+              onClick={() => { setPortalTab("PRINCIPAL_LOGIN"); setAuthError(""); }}
+              className={`pb-3 border-b-2 transition ${
+                portalTab === "PRINCIPAL_LOGIN" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400 hover:text-slate-600"
               }`}
             >
-              Platform Owner
+              Principal Admin
+            </button>
+            <button
+              onClick={() => { setPortalTab("SUPER_ADMIN"); setAuthError(""); }}
+              className={`pb-3 border-b-2 transition ${
+                portalTab === "SUPER_ADMIN" ? "border-amber-600 text-amber-600" : "border-transparent text-slate-400 hover:text-slate-600"
+              }`}
+            >
+              SuperAdmin
             </button>
           </div>
 
-          {/* Mode 1: Staff / Institute Login */}
-          {portalMode === "STAFF_LOGIN" && (
+          {/* GATEWAY 1: DESK OFFICER LOGIN (Created by Principal) */}
+          {portalTab === "OFFICER_LOGIN" && (
             <div className="space-y-4">
               <div>
-                <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">INSTITUTIONAL GATEWAY</span>
-                <h2 className="text-xl font-extrabold text-slate-900 mt-1">Sign In to Your Desk</h2>
-                <p className="text-xs text-slate-500">Enter your assigned institutional email and access PIN.</p>
+                <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">
+                  DELEGATED OFFICER DESK
+                </span>
+                <h2 className="text-xl font-extrabold text-slate-900 mt-1">Staff & Faculty Login</h2>
+                <p className="text-xs text-slate-500">Sign in with credentials assigned to you by your Principal.</p>
               </div>
 
-              {tenants.length === 0 ? (
-                <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs">
-                  <div className="font-bold flex items-center gap-1.5"><ShieldAlert className="w-4 h-4 text-amber-600" /> System Unprovisioned</div>
-                  <div className="text-[11px] mt-1">
-                    No institute tenant exists yet. The <strong>Platform Owner</strong> must log in first to create an Institute and generate its license key.
+              {users.filter(u => u.role === "OFFICER_DESK").length === 0 ? (
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 text-xs">
+                  <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                    <ShieldAlert className="w-4 h-4 text-blue-600" /> No Staff Accounts Yet
+                  </div>
+                  <div className="text-[11px] mt-1 text-slate-500">
+                    The <strong>Principal</strong> must log in first under the <strong>Principal Admin</strong> tab to create officer roles for Exam Cell, Stores, Accounts, etc.
                   </div>
                 </div>
               ) : (
@@ -339,19 +418,19 @@ export default function OfficeAIEngine() {
                     <label className="text-xs font-bold text-slate-700 block mb-1">Official Email</label>
                     <input
                       type="email"
-                      value={loginEmail}
-                      onChange={(e) => setLoginEmail(e.target.value)}
-                      placeholder="e.g. principal@college.edu or exam@college.edu"
+                      value={officerEmail}
+                      onChange={(e) => setOfficerEmail(e.target.value)}
+                      placeholder="e.g. exam@college.edu"
                       className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 font-medium"
                     />
                   </div>
 
                   <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">Access PIN</label>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">Officer PIN</label>
                     <input
                       type="password"
-                      value={loginPin}
-                      onChange={(e) => setLoginPin(e.target.value)}
+                      value={officerPin}
+                      onChange={(e) => setOfficerPin(e.target.value)}
                       placeholder="Enter assigned PIN"
                       className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
                     />
@@ -364,44 +443,110 @@ export default function OfficeAIEngine() {
                   )}
 
                   <button
-                    onClick={handleStaffLogin}
+                    onClick={handleOfficerLogin}
                     className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs py-3 rounded-xl shadow-lg transition flex items-center justify-center gap-1.5"
                   >
-                    Authenticate Desk <ArrowRight className="w-4 h-4" />
+                    Enter Delegated Desk <ArrowRight className="w-4 h-4" />
                   </button>
                 </>
               )}
             </div>
           )}
 
-          {/* Mode 2: Super Admin Access */}
-          {portalMode === "SUPER_ADMIN" && (
+          {/* GATEWAY 2: PRINCIPAL / INSTITUTE ADMIN LOGIN */}
+          {portalTab === "PRINCIPAL_LOGIN" && (
             <div className="space-y-4">
               <div>
-                <span className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">MASTER ROOT ACCESS</span>
-                <h2 className="text-xl font-extrabold text-slate-900 mt-1">Platform Owner Login</h2>
-                <p className="text-xs text-slate-500">Create institutes, issue license keys, and manage global tenants.</p>
+                <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">
+                  EXECUTIVE INSTITUTIONAL HEAD
+                </span>
+                <h2 className="text-xl font-extrabold text-slate-900 mt-1">Principal / Institute Admin</h2>
+                <p className="text-xs text-slate-500">Access college administration and delegate officer roles.</p>
+              </div>
+
+              {tenants.length === 0 ? (
+                <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs">
+                  <div className="font-bold flex items-center gap-1.5">
+                    <ShieldAlert className="w-4 h-4 text-amber-600" /> Institute Unprovisioned
+                  </div>
+                  <div className="text-[11px] mt-1">
+                    No college tenant has been provisioned yet. The <strong>SuperAdmin</strong> must issue the initial license key in the SuperAdmin tab.
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">Principal Official Email</label>
+                    <input
+                      type="email"
+                      value={principalEmail}
+                      onChange={(e) => setPrincipalEmail(e.target.value)}
+                      placeholder="e.g. principal@dpkcop.org.in"
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">License Key OR PIN</label>
+                    <input
+                      type="password"
+                      value={principalLicenseOrPin}
+                      onChange={(e) => setPrincipalLicenseOrPin(e.target.value)}
+                      placeholder="Enter License Key (BP-KEY-...) or default PIN: 1234"
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <div className="text-[10px] text-slate-400 mt-1">
+                      Initial default PIN for newly provisioned principals is <code>1234</code>.
+                    </div>
+                  </div>
+
+                  {authError && (
+                    <div className="p-2.5 rounded-lg bg-red-50 text-red-700 text-xs font-semibold flex items-center gap-1.5">
+                      <ShieldAlert className="w-4 h-4" /> {authError}
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handlePrincipalLogin}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs py-3 rounded-xl shadow-lg transition flex items-center justify-center gap-1.5"
+                  >
+                    Authenticate Principal Desk <ArrowRight className="w-4 h-4" />
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* GATEWAY 3: SUPER ADMIN (PLATFORM OWNER) */}
+          {portalTab === "SUPER_ADMIN" && (
+            <div className="space-y-4">
+              <div>
+                <span className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">
+                  PLATFORM OWNER GATEWAY
+                </span>
+                <h2 className="text-xl font-extrabold text-slate-900 mt-1">SuperAdmin Console</h2>
+                <p className="text-xs text-slate-500">Create institutes, issue cryptographic keys, and manage tenants.</p>
               </div>
 
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">Master Email</label>
                 <input
                   type="email"
-                  value={loginEmail}
-                  onChange={(e) => setLoginEmail(e.target.value)}
+                  value={superAdminEmail}
+                  onChange={(e) => setSuperAdminEmail(e.target.value)}
                   placeholder="hiteshhkumar.agrawal@gmail.com"
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-amber-500 font-medium"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">Master Platform PIN</label>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Master PIN</label>
                 <input
                   type="password"
-                  value={loginPin}
-                  onChange={(e) => setLoginPin(e.target.value)}
-                  placeholder="Default Master PIN: 9637"
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
+                  value={superAdminPin}
+                  onChange={(e) => setSuperAdminPin(e.target.value)}
+                  placeholder="Master PIN: 9637"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-slate-900 outline-none focus:ring-2 focus:ring-amber-500"
                 />
               </div>
 
@@ -415,14 +560,14 @@ export default function OfficeAIEngine() {
                 onClick={handleSuperAdminLogin}
                 className="w-full bg-slate-900 hover:bg-black text-white font-extrabold text-xs py-3 rounded-xl shadow-lg transition flex items-center justify-center gap-1.5"
               >
-                Enter Platform SuperAdmin <ArrowRight className="w-4 h-4" />
+                Access Master Provisioner <ArrowRight className="w-4 h-4" />
               </button>
             </div>
           )}
         </main>
 
         <footer className="text-center text-xs text-slate-500">
-          Office AI Genie™ • Secure Multi-Tenant Governance
+          Office AI Genie™ • Statutory Multi-Tenant Operating System
         </footer>
       </div>
     );
@@ -436,10 +581,10 @@ export default function OfficeAIEngine() {
       <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-sans">
         <header className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <span className="font-mono text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold border border-amber-500/30">
+            <span className="font-mono text-xs px-2.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold border border-amber-500/30">
               PLATFORM OWNER
             </span>
-            <h1 className="font-extrabold text-sm uppercase">Global Tenant Provisioning Console</h1>
+            <h1 className="font-extrabold text-sm uppercase">Global Tenant & License Key Generator</h1>
           </div>
           <button
             onClick={handleLogout}
@@ -450,21 +595,26 @@ export default function OfficeAIEngine() {
         </header>
 
         <main className="max-w-6xl w-full mx-auto p-6 space-y-6 flex-1">
-          {/* Tenant Creator Box */}
+          {/* Tenant Provisioning Form */}
           <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
-            <h2 className="text-base font-extrabold text-slate-900 mb-1">Provision New Institute Tenant</h2>
+            <div className="flex items-center gap-2 mb-1">
+              <Building className="w-5 h-5 text-blue-600" />
+              <h2 className="text-base font-extrabold text-slate-900">Provision New College & Generate License Key</h2>
+            </div>
             <p className="text-xs text-slate-500 mb-4">
-              Enter college details to generate its official cryptographic license key and provision the Principal's initial account.
+              Provisioning an institute registers its statutory codes, generates a cryptographic license key, and creates the Principal Admin account.
             </p>
 
             {generatedKeyNotice && (
-              <div className="mb-4 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs">
-                <div className="font-bold">License Key Generated Successfully!</div>
-                <div className="font-mono font-bold text-sm bg-white p-2 rounded border border-emerald-300 mt-1 inline-block">
-                  {generatedKeyNotice}
+              <div className="mb-5 p-4 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-950 text-xs">
+                <div className="font-bold flex items-center gap-1.5 text-emerald-800">
+                  <BadgeCheck className="w-4 h-4 text-emerald-600" /> College Provisioned & License Issued!
                 </div>
-                <div className="text-[11px] text-emerald-700 mt-1">
-                  Default Principal Account Created. PIN is <code>1234</code>.
+                <div className="mt-2 font-mono font-bold text-sm bg-white px-3 py-2 rounded-lg border border-emerald-300 inline-block text-slate-900">
+                  {generatedKeyNotice.key}
+                </div>
+                <div className="mt-2 text-[11px] text-emerald-800">
+                  Principal Account: <strong>{generatedKeyNotice.email}</strong> (Default PIN: <code>1234</code>)
                 </div>
               </div>
             )}
@@ -482,7 +632,7 @@ export default function OfficeAIEngine() {
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Governing Trust / Society</label>
+                <label className="font-bold text-slate-700 block mb-1">Governing Society / Trust</label>
                 <input
                   type="text"
                   value={newTrustName}
@@ -515,12 +665,12 @@ export default function OfficeAIEngine() {
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Principal Email (Admin Login) *</label>
+                <label className="font-bold text-slate-700 block mb-1">Principal Official Email (Login ID) *</label>
                 <input
                   type="email"
                   value={newPrincipalEmail}
                   onChange={(e) => setNewPrincipalEmail(e.target.value)}
-                  placeholder="e.g. principal@college.org.in"
+                  placeholder="e.g. principal@dpkcop.org.in"
                   className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-medium"
                 />
               </div>
@@ -531,7 +681,7 @@ export default function OfficeAIEngine() {
                   type="text"
                   value={newMsbte}
                   onChange={(e) => setNewMsbte(e.target.value)}
-                  placeholder="e.g. 62386"
+                  placeholder="62386"
                   className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-mono"
                 />
               </div>
@@ -542,7 +692,7 @@ export default function OfficeAIEngine() {
                   type="text"
                   value={newDte}
                   onChange={(e) => setNewDte(e.target.value)}
-                  placeholder="e.g. 5539"
+                  placeholder="5539"
                   className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-mono"
                 />
               </div>
@@ -553,7 +703,7 @@ export default function OfficeAIEngine() {
                   type="text"
                   value={newPci}
                   onChange={(e) => setNewPci(e.target.value)}
-                  placeholder="e.g. 9178"
+                  placeholder="9178"
                   className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-mono"
                 />
               </div>
@@ -564,7 +714,7 @@ export default function OfficeAIEngine() {
                   type="text"
                   value={newAishe}
                   onChange={(e) => setNewAishe(e.target.value)}
-                  placeholder="e.g. S-22693"
+                  placeholder="S-22693"
                   className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-mono"
                 />
               </div>
@@ -572,31 +722,35 @@ export default function OfficeAIEngine() {
 
             <button
               onClick={handleCreateTenant}
-              className="mt-4 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 transition"
+              className="mt-4 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-sm"
             >
-              <PlusCircle className="w-4 h-4" /> Provision Institute & Issue Key
+              <Key className="w-4 h-4" /> Issue Cryptographic Key & Provision Tenant
             </button>
           </div>
 
-          {/* Active Tenants List */}
+          {/* Provisioned Tenants List */}
           <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
-            <h2 className="text-base font-extrabold text-slate-900 mb-3">Provisioned Institutional Tenants ({tenants.length})</h2>
+            <h2 className="text-base font-extrabold text-slate-900 mb-3">
+              Provisioned Colleges & Keys ({tenants.length})
+            </h2>
             {tenants.length === 0 ? (
-              <div className="text-xs text-slate-400 py-6 text-center">No college tenants provisioned yet. Use the form above.</div>
+              <div className="text-xs text-slate-400 py-6 text-center">
+                Zero colleges provisioned. Use the form above to issue your first license key.
+              </div>
             ) : (
               <div className="divide-y divide-slate-100 text-xs">
                 {tenants.map((t) => (
-                  <div key={t.id} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div key={t.id} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
-                      <div className="font-bold text-slate-900 text-sm">{t.name}</div>
+                      <div className="font-extrabold text-slate-900 text-sm">{t.name}</div>
                       <div className="text-slate-500">{t.location} • Principal: {t.principalName} ({t.principalEmail})</div>
                       <div className="text-[10px] text-blue-600 font-mono mt-0.5">
-                        Codes: MSBTE: {t.msbteCode || "-"} | DTE: {t.dteCode || "-"} | PCI: {t.pciCode || "-"}
+                        MSBTE: {t.msbteCode || "-"} | DTE: {t.dteCode || "-"} | PCI: {t.pciCode || "-"} | AISHE: {t.aisheCode || "-"}
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-[10px] text-slate-400 font-semibold uppercase">Cryptographic License Key</div>
-                      <code className="text-xs font-bold text-slate-900 bg-slate-100 px-2 py-1 rounded border border-slate-200 inline-block font-mono">
+                      <div className="text-[10px] text-slate-400 font-bold uppercase">Issued License Key</div>
+                      <code className="text-xs font-bold text-slate-900 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200 inline-block font-mono mt-0.5">
                         {t.licenseKey}
                       </code>
                     </div>
@@ -611,13 +765,13 @@ export default function OfficeAIEngine() {
   }
 
   // =========================================================================
-  // VIEW 3: AUTHENTICATED DESK WORKSPACE (PRINCIPAL & STAFF)
+  // VIEW 3: DESK WORKSPACE (PRINCIPAL & DELEGATED OFFICERS)
   // =========================================================================
   const isPrincipal = sessionUser.role === "INSTITUTE_ADMIN";
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
-      {/* Top Header */}
+      {/* Header */}
       <header className="border-b border-slate-200 bg-white sticky top-0 z-40 px-6 py-3 shadow-xs">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -650,7 +804,7 @@ export default function OfficeAIEngine() {
           </div>
         </div>
 
-        {/* Operational Desk Navigation */}
+        {/* Desk Switcher */}
         <div className="mt-3 pt-3 border-t border-slate-100 flex items-center flex-wrap gap-2 text-xs">
           <button
             onClick={() => setActiveDesk("OVERVIEW")}
@@ -720,16 +874,19 @@ export default function OfficeAIEngine() {
 
       {/* Main Workspace Body */}
       <main className="p-6 max-w-6xl w-full mx-auto space-y-6 flex-1">
-        {/* VIEW A: ROLE DELEGATION (PRINCIPAL ONLY) */}
+        {/* VIEW A: ROLE DELEGATION (PRINCIPAL ADMIN ONLY) */}
         {activeDesk === "ROLE_MANAGEMENT" && isPrincipal && (
           <div className="space-y-6">
             <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
-              <h2 className="text-base font-extrabold text-slate-900 mb-1">Create Institutional Desk Role</h2>
+              <div className="flex items-center gap-2 mb-1">
+                <Users className="w-5 h-5 text-blue-600" />
+                <h2 className="text-base font-extrabold text-slate-900">Create Staff / Desk Officer Account</h2>
+              </div>
               <p className="text-xs text-slate-500 mb-4">
-                Delegate departmental access to your faculty or administrative staff. They will log in using their email and assigned PIN.
+                Assign specific departmental roles to your faculty and staff. They will sign in using the <strong>Desk Officer</strong> login tab.
               </p>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">Officer Name *</label>
                   <input
@@ -741,7 +898,7 @@ export default function OfficeAIEngine() {
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Officer Email *</label>
+                  <label className="font-bold text-slate-700 block mb-1">Official Email *</label>
                   <input
                     type="email"
                     value={newStaffEmail}
@@ -789,29 +946,35 @@ export default function OfficeAIEngine() {
                 onClick={handleCreateRole}
                 className="mt-4 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 transition"
               >
-                <PlusCircle className="w-4 h-4" /> Issue Officer Credentials
+                <PlusCircle className="w-4 h-4" /> Issue Officer Account
               </button>
             </div>
 
-            {/* Existing Roles in this Institute */}
+            {/* Created Officers List */}
             <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
               <h3 className="text-sm font-extrabold text-slate-900 mb-3">
                 Active Staff & Desk Officers for {sessionTenant?.name}
               </h3>
-              <div className="divide-y divide-slate-100 text-xs">
-                {users.filter((u) => u.instituteId === sessionTenant?.id).map((u) => (
-                  <div key={u.id} className="py-2.5 flex items-center justify-between">
-                    <div>
-                      <span className="font-bold text-slate-900">{u.name}</span>
-                      <span className="text-slate-400 ml-2">({u.email})</span>
-                      <div className="text-[11px] text-blue-600 font-medium">{u.designationTitle}</div>
+              {users.filter((u) => u.instituteId === sessionTenant?.id && u.role === "OFFICER_DESK").length === 0 ? (
+                <div className="text-xs text-slate-400 py-6 text-center">
+                  Zero officer accounts created yet. Use the form above to add your first desk officer.
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100 text-xs">
+                  {users.filter((u) => u.instituteId === sessionTenant?.id && u.role === "OFFICER_DESK").map((u) => (
+                    <div key={u.id} className="py-2.5 flex items-center justify-between">
+                      <div>
+                        <span className="font-bold text-slate-900">{u.name}</span>
+                        <span className="text-slate-400 ml-2">({u.email})</span>
+                        <div className="text-[11px] text-blue-600 font-medium">{u.designationTitle}</div>
+                      </div>
+                      <span className="font-mono text-[10px] bg-slate-100 px-2.5 py-0.5 rounded border border-slate-200 font-bold">
+                        Scope: {u.allowedDesks.join(", ")}
+                      </span>
                     </div>
-                    <span className="font-mono text-[10px] bg-slate-100 px-2 py-0.5 rounded border border-slate-200 font-bold">
-                      Scope: {u.allowedDesks.join(", ")}
-                    </span>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -822,7 +985,7 @@ export default function OfficeAIEngine() {
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
               <div>
                 <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">
-                  LIVE OPERATIONAL DESK
+                  LIVE STATUTORY DESK
                 </span>
                 <h2 className="text-lg font-extrabold text-slate-900">{activeDesk.replace("_", " ")} Register</h2>
                 <p className="text-xs text-slate-500">Official live statutory register. Starts completely blank.</p>
@@ -893,7 +1056,7 @@ export default function OfficeAIEngine() {
               </div>
             </div>
 
-            {/* Audit Trail */}
+            {/* Audit Ledger */}
             <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
               <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
                 <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
@@ -935,7 +1098,7 @@ export default function OfficeAIEngine() {
 
             <div className="space-y-3 text-xs">
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Primary Title / Subject / Name *</label>
+                <label className="font-bold text-slate-700 block mb-1">Primary Title / Item / Subject *</label>
                 <input
                   type="text"
                   value={entryField1}
