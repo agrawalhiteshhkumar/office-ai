@@ -1,1257 +1,948 @@
-"use client";
+'use client';
 
-import React, { useState, useEffect } from "react";
-import { 
-  InstituteTenant, 
-  InstitutionalUser, 
-  SUPER_ADMIN_CREDENTIALS, 
-  STORAGE_KEYS 
-} from "@/data/authData";
-
-// Statutory Modal & Print Engines
-import ExamCellModal from "@/components/ExamCellModal";
-import CadreRosterModal from "@/components/CadreRosterModal";
-import FRAModal from "@/components/FRAModal";
-import StoresModal from "@/components/StoresModal";
-import AdmissionsModal from "@/components/AdmissionsModal";
-
+import React, { useState, useEffect } from 'react';
 import { 
   Building2, 
-  ShieldCheck, 
-  Layers, 
-  History, 
-  CheckCircle2, 
-  Sparkles, 
-  LogOut, 
-  KeyRound, 
-  ArrowRight, 
-  PlusCircle, 
-  Lock, 
-  Users, 
   FileText, 
-  Cpu, 
-  Boxes, 
-  GraduationCap, 
-  IndianRupee, 
-  UserCheck, 
-  BookOpen, 
-  ShieldAlert,
+  Users, 
+  Layers, 
+  ShieldCheck, 
+  Printer, 
+  Search, 
+  ChevronRight, 
+  Lock, 
+  CheckCircle2, 
+  AlertTriangle,
   Key,
+  Database,
+  ArrowUpRight,
+  LogOut,
+  Sparkles,
+  Award,
   BadgeCheck,
-  Building,
-  Printer,
-  FileCheck
-} from "lucide-react";
+  Mail,
+  Phone
+} from 'lucide-react';
+
+import ExamCellModal from '@/components/ExamCellModal';
+import CadreRosterModal from '@/components/CadreRosterModal';
+import FRAModal from '@/components/FRAModal';
+import StoresModal from '@/components/StoresModal';
+import AdmissionsModal from '@/components/AdmissionsModal';
+
+// --- TYPES & INTERFACES ---
+interface InstitutionProfile {
+  id: string;
+  name: string;
+  society: string;
+  location: string;
+  msbteCode: string;
+  dteCode: string;
+  pciCode: string;
+  aisheCode: string;
+  principalName: string;
+  principalEmail: string;
+  licenseKey: string;
+  createdAt: string;
+}
+
+interface AuditLog {
+  id: string;
+  timestamp: string;
+  actor: string;
+  action: string;
+  details: string;
+  hash: string;
+}
+
+interface StaffUser {
+  id: string;
+  name: string;
+  email: string;
+  role: 'EXAM_INCHARGE' | 'ESTABLISHMENT_OFFICER' | 'ACCOUNTANT' | 'STORE_KEEPER' | 'ADMISSION_NODAL';
+  deskAssigned: string;
+  pin: string;
+}
 
 export default function OfficeAIEngine() {
-  const [mounted, setMounted] = useState(false);
-
-  // Persistence State
-  const [tenants, setTenants] = useState<InstituteTenant[]>([]);
-  const [users, setUsers] = useState<InstitutionalUser[]>([]);
+  const [activeTab, setActiveTab] = useState<'LOGIN' | 'PORTAL' | 'SUPERADMIN'>('LOGIN');
+  const [loginRole, setLoginRole] = useState<'STAFF' | 'PRINCIPAL' | 'SUPERADMIN'>('STAFF');
   
-  // Auth Session State
-  const [sessionUser, setSessionUser] = useState<InstitutionalUser | null>(null);
-  const [sessionTenant, setSessionTenant] = useState<InstituteTenant | null>(null);
-  const [isSuperAdminSession, setIsSuperAdminSession] = useState(false);
+  // SuperAdmin Provisioning State
+  const [institutions, setInstitutions] = useState<InstitutionProfile[]>([]);
+  const [newInst, setNewInst] = useState({
+    name: 'D. P. Kharde Navjeevan College of Pharmacy',
+    society: 'Navjeevan Education Society',
+    location: 'Sinnar, Nashik',
+    msbteCode: '62386',
+    dteCode: '5539',
+    pciCode: '9178',
+    aisheCode: 'S-22693',
+    principalName: 'Dr. Hiteshkumar Agrawal',
+    principalEmail: 'hiteshhkumar.agrawal@gmail.com'
+  });
 
-  // 3 Distinct Gateway Tabs
-  const [portalTab, setPortalTab] = useState<"OFFICER_LOGIN" | "PRINCIPAL_LOGIN" | "SUPER_ADMIN">("OFFICER_LOGIN");
-  
+  // Current Active Tenant Session
+  const [currentTenant, setCurrentTenant] = useState<InstitutionProfile | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ name: string; role: string } | null>(null);
+
+  // Desk Staff Users
+  const [staffUsers, setStaffUsers] = useState<StaffUser[]>([]);
+
+  // Modals Control
+  const [activeModal, setActiveModal] = useState<string | null>(null);
+
+  // Cryptographic Audit Trail
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+
   // Login Form States
-  const [officerEmail, setOfficerEmail] = useState("");
-  const [officerPin, setOfficerPin] = useState("");
+  const [principalEmailInput, setPrincipalEmailInput] = useState('');
+  const [principalKeyInput, setPrincipalKeyInput] = useState('');
+  const [staffEmailInput, setStaffEmailInput] = useState('');
+  const [staffPinInput, setStaffPinInput] = useState('');
+  const [superAdminEmail, setSuperAdminEmail] = useState('hiteshhkumar.agrawal@gmail.com');
+  const [superAdminPin, setSuperAdminPin] = useState('9637');
 
-  const [principalEmail, setPrincipalEmail] = useState("");
-  const [principalLicenseOrPin, setPrincipalLicenseOrPin] = useState("");
-
-  const [superAdminEmail, setSuperAdminEmail] = useState("");
-  const [superAdminPin, setSuperAdminPin] = useState("");
-
-  const [authError, setAuthError] = useState("");
-
-  // Super Admin Tenant Creator Form
-  const [newInstName, setNewInstName] = useState("");
-  const [newTrustName, setNewTrustName] = useState("");
-  const [newLocation, setNewLocation] = useState("");
-  const [newPrincipal, setNewPrincipal] = useState("");
-  const [newPrincipalEmail, setNewPrincipalEmail] = useState("");
-  const [newMsbte, setNewMsbte] = useState("");
-  const [newDte, setNewDte] = useState("");
-  const [newPci, setNewPci] = useState("");
-  const [newAishe, setNewAishe] = useState("");
-  const [generatedKeyNotice, setGeneratedKeyNotice] = useState<{ key: string; name: string; email: string } | null>(null);
-
-  // Institute Admin: Role Creator Form State
-  const [newStaffName, setNewStaffName] = useState("");
-  const [newStaffEmail, setNewStaffEmail] = useState("");
-  const [newStaffDesignation, setNewStaffDesignation] = useState("");
-  const [newStaffPin, setNewStaffPin] = useState("");
-  const [selectedDeskScope, setSelectedDeskScope] = useState<string>("EXAM_CELL");
-
-  // Operational desk selected
-  const [activeDesk, setActiveDesk] = useState<string>("OVERVIEW");
-  const [deskRecords, setDeskRecords] = useState<any[]>([]);
-  const [auditLedger, setAuditLedger] = useState<any[]>([]);
-
-  // Modals States for Statutory Print Engines
-  const [isExamModalOpen, setIsExamModalOpen] = useState(false);
-  const [isCadreModalOpen, setIsCadreModalOpen] = useState(false);
-  const [isFRAModalOpen, setIsFRAModalOpen] = useState(false);
-  const [isStoresModalOpen, setIsStoresModalOpen] = useState(false);
-  const [isAdmissionsModalOpen, setIsAdmissionsModalOpen] = useState(false);
-
-  // Custom Record Creator Modal
-  const [showAddEntryModal, setShowAddEntryModal] = useState(false);
-  const [entryField1, setEntryField1] = useState("");
-  const [entryField2, setEntryField2] = useState("");
-  const [entryField3, setEntryField3] = useState("");
-
-  // Load persistence
+  // Load Initial State
   useEffect(() => {
-    setMounted(true);
-    try {
-      const storedTenants = localStorage.getItem(STORAGE_KEYS.TENANTS);
-      const storedUsers = localStorage.getItem(STORAGE_KEYS.USERS);
-      if (storedTenants) setTenants(JSON.parse(storedTenants));
-      if (storedUsers) setUsers(JSON.parse(storedUsers));
-    } catch (e) {
-      console.error(e);
+    const savedTenants = localStorage.getItem('office_ai_tenants');
+    if (savedTenants) {
+      try {
+        const parsed = JSON.parse(savedTenants);
+        setInstitutions(parsed);
+        if (parsed.length > 0 && !currentTenant) {
+          // Pre-select first for convenience
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    const savedStaff = localStorage.getItem('office_ai_staff');
+    if (savedStaff) {
+      try {
+        setStaffUsers(JSON.parse(savedStaff));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    const savedLogs = localStorage.getItem('office_ai_audit_logs');
+    if (savedLogs) {
+      try {
+        setAuditLogs(JSON.parse(savedLogs));
+      } catch (e) {
+        console.error(e);
+      }
     }
   }, []);
 
-  const saveTenants = (newTenants: InstituteTenant[]) => {
-    setTenants(newTenants);
-    localStorage.setItem(STORAGE_KEYS.TENANTS, JSON.stringify(newTenants));
+  const saveAuditLog = (action: string, details: string, actorOverride?: string) => {
+    const log: AuditLog = {
+      id: 'LOG-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
+      timestamp: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
+      actor: actorOverride || currentUser?.name || 'System Principal',
+      action,
+      details,
+      hash: '0x' + Math.random().toString(16).substring(2, 10) + '...' + Math.random().toString(16).substring(2, 6)
+    };
+    const updated = [log, ...auditLogs];
+    setAuditLogs(updated);
+    localStorage.setItem('office_ai_audit_logs', JSON.stringify(updated));
   };
 
-  const saveUsers = (newUsers: InstitutionalUser[]) => {
-    setUsers(newUsers);
-    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(newUsers));
+  // SuperAdmin Provision New Tenant
+  const handleProvisionTenant = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newLicenseKey = 'BP-KEY-' + Math.random().toString(36).substring(2, 8).toUpperCase() + '-' + newInst.msbteCode;
+    const tenant: InstitutionProfile = {
+      id: 'INST-' + Date.now(),
+      ...newInst,
+      licenseKey: newLicenseKey,
+      createdAt: new Date().toISOString()
+    };
+
+    const updated = [...institutions, tenant];
+    setInstitutions(updated);
+    localStorage.setItem('office_ai_tenants', JSON.stringify(updated));
+
+    // Seed default staff
+    const defaultStaff: StaffUser[] = [
+      { id: 'STF-1', name: 'Exam Officer', email: 'exam@dpkcop.edu', role: 'EXAM_INCHARGE', deskAssigned: 'MSBTE Exam Cell', pin: '1234' },
+      { id: 'STF-2', name: 'Establishment Clerk', email: 'estab@dpkcop.edu', role: 'ESTABLISHMENT_OFFICER', deskAssigned: 'PCI Cadre Roster', pin: '1234' },
+      { id: 'STF-3', name: 'Accountant', email: 'accounts@dpkcop.edu', role: 'ACCOUNTANT', deskAssigned: 'FFC/FRA Accounts', pin: '1234' },
+      { id: 'STF-4', name: 'Store Keeper', email: 'store@dpkcop.edu', role: 'STORE_KEEPER', deskAssigned: 'Stores & Dead Stock', pin: '1234' },
+      { id: 'STF-5', name: 'Admission Nodal Officer', email: 'admission@dpkcop.edu', role: 'ADMISSION_NODAL', deskAssigned: 'DTE Admissions', pin: '1234' }
+    ];
+    setStaffUsers(defaultStaff);
+    localStorage.setItem('office_ai_staff', JSON.stringify(defaultStaff));
+
+    saveAuditLog('TENANT_PROVISIONED', `Master provisioned new institution: ${tenant.name} [License: ${newLicenseKey}]`, 'SuperAdmin Architect');
+    alert(`Institution successfully provisioned!\n\nLicense Key: ${newLicenseKey}\nPrincipal Email: ${tenant.principalEmail}`);
   };
 
-  // 1. Super Admin: Provision Tenant & Generate Key
-  const handleCreateTenant = () => {
-    if (!newInstName.trim() || !newPrincipalEmail.trim()) {
-      alert("College Legal Name and Principal Email are mandatory.");
-      return;
-    }
-
-    const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
-    const licenseKey = `BP-KEY-${newMsbte || "INST"}-${randomSuffix}`;
-
-    const newTenant: InstituteTenant = {
-      id: "TENANT-" + Date.now(),
-      name: newInstName.trim(),
-      trustName: newTrustName.trim(),
-      location: newLocation.trim(),
-      licenseKey: licenseKey,
-      msbteCode: newMsbte.trim(),
-      dteCode: newDte.trim(),
-      pciCode: newPci.trim(),
-      aisheCode: newAishe.trim(),
-      createdAt: new Date().toLocaleDateString("en-IN"),
-      principalName: newPrincipal.trim() || "Principal",
-      principalEmail: newPrincipalEmail.trim(),
-    };
-
-    // Provision Principal (Institute Admin) user
-    const principalUser: InstitutionalUser = {
-      id: "USR-PRIN-" + Date.now(),
-      instituteId: newTenant.id,
-      name: newTenant.principalName,
-      email: newTenant.principalEmail,
-      role: "INSTITUTE_ADMIN",
-      designationTitle: "Principal & Head of Institute",
-      accessPin: "1234",
-      allowedDesks: ["ALL"],
-    };
-
-    const updatedTenants = [...tenants, newTenant];
-    const updatedUsers = [...users, principalUser];
-
-    saveTenants(updatedTenants);
-    saveUsers(updatedUsers);
-
-    setGeneratedKeyNotice({
-      key: licenseKey,
-      name: newTenant.name,
-      email: newTenant.principalEmail,
-    });
-
-    setNewInstName("");
-    setNewTrustName("");
-    setNewLocation("");
-    setNewPrincipal("");
-    setNewPrincipalEmail("");
-    setNewMsbte("");
-    setNewDte("");
-    setNewPci("");
-    setNewAishe("");
-  };
-
-  // 2. Institute Admin: Create Staff / Officer Roles
-  const handleCreateRole = () => {
-    if (!sessionTenant || !newStaffName.trim() || !newStaffEmail.trim() || !newStaffPin.trim()) {
-      alert("Name, email, and access PIN are mandatory.");
-      return;
-    }
-
-    const newUser: InstitutionalUser = {
-      id: "USR-STAFF-" + Date.now(),
-      instituteId: sessionTenant.id,
-      name: newStaffName.trim(),
-      email: newStaffEmail.trim(),
-      role: "OFFICER_DESK",
-      designationTitle: newStaffDesignation.trim() || "Desk Officer",
-      accessPin: newStaffPin.trim(),
-      allowedDesks: [selectedDeskScope],
-    };
-
-    const updated = [...users, newUser];
-    saveUsers(updated);
-
-    const log = {
-      id: "LOG-" + Math.random().toString(16).substring(2, 8).toUpperCase(),
-      timestamp: new Date().toLocaleTimeString(),
-      actor: `${sessionUser?.name} (Principal)`,
-      action: "ROLE_DELEGATION_ISSUED",
-      details: `Created officer account for ${newUser.name} [Scope: ${selectedDeskScope}]`,
-      hash: "0x" + Math.random().toString(16).substring(2, 10),
-    };
-    setAuditLedger((prev) => [log, ...prev]);
-
-    setNewStaffName("");
-    setNewStaffEmail("");
-    setNewStaffDesignation("");
-    setNewStaffPin("");
-    alert(`Desk Officer created! Email: ${newUser.email}, PIN: ${newUser.accessPin}`);
-  };
-
-  // 3. Login 1: Desk Officer (Created by Principal)
-  const handleOfficerLogin = () => {
-    setAuthError("");
-    const matchedUser = users.find(
-      (u) => 
-        u.role === "OFFICER_DESK" &&
-        u.email.toLowerCase().trim() === officerEmail.toLowerCase().trim() && 
-        u.accessPin === officerPin.trim()
+  // Login Handlers
+  const handlePrincipalLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    const match = institutions.find(
+      i => i.principalEmail.toLowerCase() === principalEmailInput.trim().toLowerCase() && 
+           (i.licenseKey === principalKeyInput.trim() || principalKeyInput.trim() === '1234')
     );
 
-    if (!matchedUser) {
-      setAuthError("Invalid Officer credentials. Make sure your role has been created by the Principal.");
-      return;
+    if (match) {
+      setCurrentTenant(match);
+      setCurrentUser({ name: match.principalName, role: 'Principal & Head of Institute' });
+      setActiveTab('PORTAL');
+      saveAuditLog('PRINCIPAL_LOGIN', `Principal ${match.principalName} logged into ${match.name}`, match.principalName);
+    } else {
+      alert('Invalid Principal Email or Institutional License Key. If testing, please provision a tenant under SuperAdmin first.');
     }
-
-    const tenant = tenants.find((t) => t.id === matchedUser.instituteId);
-    if (!tenant) {
-      setAuthError("Parent institute tenant not found.");
-      return;
-    }
-
-    setSessionUser(matchedUser);
-    setSessionTenant(tenant);
-    setIsSuperAdminSession(false);
-    setActiveDesk(matchedUser.allowedDesks[0] || "OVERVIEW");
   };
 
-  // 4. Login 2: Principal / Institute Admin
-  const handlePrincipalLogin = () => {
-    setAuthError("");
-    const cleanEmail = principalEmail.toLowerCase().trim();
-    const cleanSecret = principalLicenseOrPin.trim();
-
-    const matchedPrincipal = users.find(
-      (u) => 
-        u.role === "INSTITUTE_ADMIN" &&
-        u.email.toLowerCase().trim() === cleanEmail
+  const handleStaffLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    const staff = staffUsers.find(
+      s => s.email.toLowerCase() === staffEmailInput.trim().toLowerCase() && s.pin === staffPinInput.trim()
     );
 
-    if (!matchedPrincipal) {
-      setAuthError("No Institute Admin account found for this email.");
-      return;
-    }
-
-    const tenant = tenants.find((t) => t.id === matchedPrincipal.instituteId);
-    if (!tenant) {
-      setAuthError("Institute tenant not found.");
-      return;
-    }
-
-    if (matchedPrincipal.accessPin === cleanSecret || tenant.licenseKey === cleanSecret) {
-      setSessionUser(matchedPrincipal);
-      setSessionTenant(tenant);
-      setIsSuperAdminSession(false);
-      setActiveDesk("OVERVIEW");
+    if (staff) {
+      const activeInst = institutions[0] || {
+        id: 'INST-DEFAULT',
+        name: 'D. P. Kharde Navjeevan College of Pharmacy, Sinnar',
+        society: 'Navjeevan Education Society',
+        location: 'Sinnar, Nashik',
+        msbteCode: '62386',
+        dteCode: '5539',
+        pciCode: '9178',
+        aisheCode: 'S-22693',
+        principalName: 'Dr. Hiteshkumar Agrawal',
+        principalEmail: 'hiteshhkumar.agrawal@gmail.com',
+        licenseKey: 'BP-DEMO-62386',
+        createdAt: new Date().toISOString()
+      };
+      setCurrentTenant(activeInst);
+      setCurrentUser({ name: staff.name, role: staff.deskAssigned });
+      setActiveTab('PORTAL');
+      saveAuditLog('STAFF_LOGIN', `Staff user ${staff.name} signed in for desk: ${staff.deskAssigned}`, staff.name);
     } else {
-      setAuthError("Invalid PIN or License Key for this Principal account.");
+      alert('Invalid Staff Credentials. Use the sample logins: exam@dpkcop.edu / PIN: 1234');
     }
   };
 
-  // 5. Login 3: Super Admin (Platform Owner)
-  const handleSuperAdminLogin = () => {
-    setAuthError("");
-    if (
-      superAdminEmail.trim().toLowerCase() === SUPER_ADMIN_CREDENTIALS.email.toLowerCase() &&
-      superAdminPin.trim() === SUPER_ADMIN_CREDENTIALS.masterPin
-    ) {
-      setIsSuperAdminSession(true);
-      setSessionUser({
-        id: "ROOT",
-        instituteId: "ROOT",
-        name: "Dr. Hiteshkumar Agrawal",
-        email: SUPER_ADMIN_CREDENTIALS.email,
-        role: "PLATFORM_SUPER_ADMIN",
-        designationTitle: "Platform Owner & Chief Architect",
-        accessPin: SUPER_ADMIN_CREDENTIALS.masterPin,
-        allowedDesks: ["ALL"],
-      });
+  const handleSuperAdminLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (superAdminEmail === 'hiteshhkumar.agrawal@gmail.com' && superAdminPin === '9637') {
+      setActiveTab('SUPERADMIN');
+      setCurrentUser({ name: 'Dr. Hiteshkumar Agrawal', role: 'Platform Architect & SuperAdmin' });
+      saveAuditLog('SUPERADMIN_ACCESS', 'Master platform architect console accessed', 'SuperAdmin');
     } else {
-      setAuthError("Invalid Platform Owner credentials.");
+      alert('Unauthorized Master Access.');
     }
   };
 
   const handleLogout = () => {
-    setSessionUser(null);
-    setSessionTenant(null);
-    setIsSuperAdminSession(false);
-    setOfficerEmail("");
-    setOfficerPin("");
-    setPrincipalEmail("");
-    setPrincipalLicenseOrPin("");
-    setSuperAdminEmail("");
-    setSuperAdminPin("");
-    setAuthError("");
+    if (currentUser) {
+      saveAuditLog('USER_LOGOUT', `${currentUser.name} signed out`);
+    }
+    setCurrentTenant(null);
+    setCurrentUser(null);
+    setActiveTab('LOGIN');
   };
-
-  // Audit logger passed to modals
-  const handleLogAudit = (action: string, details: string) => {
-    const log = {
-      id: "LOG-" + Math.random().toString(16).substring(2, 8).toUpperCase(),
-      timestamp: new Date().toLocaleTimeString(),
-      actor: `${sessionUser?.name} (${sessionUser?.designationTitle})`,
-      action: action,
-      details: details,
-      hash: "0x" + Math.random().toString(16).substring(2, 10),
-    };
-    setAuditLedger((prev) => [log, ...prev]);
-  };
-
-  // Custom record creator
-  const handleAddBlankRecord = () => {
-    if (!entryField1) return;
-    const newRecord = {
-      id: "REC-" + Date.now().toString().slice(-4),
-      desk: activeDesk,
-      field1: entryField1,
-      field2: entryField2,
-      field3: entryField3,
-      createdAt: new Date().toLocaleTimeString(),
-      officer: sessionUser?.name || "Officer",
-    };
-    setDeskRecords([newRecord, ...deskRecords]);
-    handleLogAudit("STATUTORY_ENTRY_SAVED", `Added ${entryField1} in ${activeDesk}`);
-
-    setEntryField1("");
-    setEntryField2("");
-    setEntryField3("");
-    setShowAddEntryModal(false);
-  };
-
-  if (!mounted) return null;
-
-  // =========================================================================
-  // VIEW 1: AUTHENTICATION GATEWAY (3 DISTINCT LOGINS)
-  // =========================================================================
-  if (!sessionUser) {
-    return (
-      <div className="min-h-screen bg-slate-950 text-white flex flex-col justify-between p-6 font-sans">
-        <header className="max-w-5xl w-full mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-white p-1 flex items-center justify-center">
-              <img 
-                src="https://raw.githubusercontent.com/agrawalhiteshhkumar/faculty-ai-genie/main/brightpath-logo.png" 
-                alt="Logo" 
-                className="h-full w-full object-contain"
-              />
-            </div>
-            <div>
-              <div className="font-extrabold text-sm tracking-tight text-white uppercase">OFFICE AI GENIE™</div>
-              <div className="text-[9px] font-black tracking-widest text-amber-400 uppercase">LEARN. SKILL. SUCCEED.</div>
-            </div>
-          </div>
-          <span className="text-xs text-slate-400 font-mono">v2026.4 Multi-Tenant Engine</span>
-        </header>
-
-        <main className="max-w-lg w-full mx-auto my-6 bg-white text-slate-900 rounded-3xl p-6 sm:p-8 shadow-2xl">
-          {/* 3 Distinct Gateway Tabs */}
-          <div className="grid grid-cols-3 border-b border-slate-200 mb-6 text-xs font-bold text-center">
-            <button
-              onClick={() => { setPortalTab("OFFICER_LOGIN"); setAuthError(""); }}
-              className={`pb-3 border-b-2 transition ${
-                portalTab === "OFFICER_LOGIN" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400 hover:text-slate-600"
-              }`}
-            >
-              Desk Officer
-            </button>
-            <button
-              onClick={() => { setPortalTab("PRINCIPAL_LOGIN"); setAuthError(""); }}
-              className={`pb-3 border-b-2 transition ${
-                portalTab === "PRINCIPAL_LOGIN" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400 hover:text-slate-600"
-              }`}
-            >
-              Principal Admin
-            </button>
-            <button
-              onClick={() => { setPortalTab("SUPER_ADMIN"); setAuthError(""); }}
-              className={`pb-3 border-b-2 transition ${
-                portalTab === "SUPER_ADMIN" ? "border-amber-600 text-amber-600" : "border-transparent text-slate-400 hover:text-slate-600"
-              }`}
-            >
-              SuperAdmin
-            </button>
-          </div>
-
-          {/* GATEWAY 1: DESK OFFICER LOGIN */}
-          {portalTab === "OFFICER_LOGIN" && (
-            <div className="space-y-4">
-              <div>
-                <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">
-                  DELEGATED OFFICER DESK
-                </span>
-                <h2 className="text-xl font-extrabold text-slate-900 mt-1">Staff & Faculty Login</h2>
-                <p className="text-xs text-slate-500">Sign in with credentials assigned to you by your Principal.</p>
-              </div>
-
-              {users.filter(u => u.role === "OFFICER_DESK").length === 0 ? (
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 text-xs">
-                  <div className="font-bold text-slate-800 flex items-center gap-1.5">
-                    <ShieldAlert className="w-4 h-4 text-blue-600" /> No Staff Accounts Yet
-                  </div>
-                  <div className="text-[11px] mt-1 text-slate-500">
-                    The <strong>Principal</strong> must log in first under the <strong>Principal Admin</strong> tab to create officer roles for Exam Cell, Stores, Accounts, etc.
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">Official Email</label>
-                    <input
-                      type="email"
-                      value={officerEmail}
-                      onChange={(e) => setOfficerEmail(e.target.value)}
-                      placeholder="e.g. exam@college.edu"
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 font-medium"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">Officer PIN</label>
-                    <input
-                      type="password"
-                      value={officerPin}
-                      onChange={(e) => setOfficerPin(e.target.value)}
-                      placeholder="Enter assigned PIN"
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  {authError && (
-                    <div className="p-2.5 rounded-lg bg-red-50 text-red-700 text-xs font-semibold flex items-center gap-1.5">
-                      <ShieldAlert className="w-4 h-4" /> {authError}
-                    </div>
-                  )}
-
-                  <button
-                    onClick={handleOfficerLogin}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs py-3 rounded-xl shadow-lg transition flex items-center justify-center gap-1.5"
-                  >
-                    Enter Delegated Desk <ArrowRight className="w-4 h-4" />
-                  </button>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* GATEWAY 2: PRINCIPAL ADMIN */}
-          {portalTab === "PRINCIPAL_LOGIN" && (
-            <div className="space-y-4">
-              <div>
-                <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">
-                  EXECUTIVE INSTITUTIONAL HEAD
-                </span>
-                <h2 className="text-xl font-extrabold text-slate-900 mt-1">Principal / Institute Admin</h2>
-                <p className="text-xs text-slate-500">Access college administration and delegate officer roles.</p>
-              </div>
-
-              {tenants.length === 0 ? (
-                <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs">
-                  <div className="font-bold flex items-center gap-1.5">
-                    <ShieldAlert className="w-4 h-4 text-amber-600" /> Institute Unprovisioned
-                  </div>
-                  <div className="text-[11px] mt-1">
-                    No college tenant has been provisioned yet. The <strong>SuperAdmin</strong> must issue the initial license key in the SuperAdmin tab.
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">Principal Official Email</label>
-                    <input
-                      type="email"
-                      value={principalEmail}
-                      onChange={(e) => setPrincipalEmail(e.target.value)}
-                      placeholder="e.g. principal@dpkcop.org.in"
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 font-medium"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">License Key OR PIN</label>
-                    <input
-                      type="password"
-                      value={principalLicenseOrPin}
-                      onChange={(e) => setPrincipalLicenseOrPin(e.target.value)}
-                      placeholder="Enter License Key (BP-KEY-...) or default PIN: 1234"
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <div className="text-[10px] text-slate-400 mt-1">
-                      Initial default PIN for newly provisioned principals is <code>1234</code>.
-                    </div>
-                  </div>
-
-                  {authError && (
-                    <div className="p-2.5 rounded-lg bg-red-50 text-red-700 text-xs font-semibold flex items-center gap-1.5">
-                      <ShieldAlert className="w-4 h-4" /> {authError}
-                    </div>
-                  )}
-
-                  <button
-                    onClick={handlePrincipalLogin}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs py-3 rounded-xl shadow-lg transition flex items-center justify-center gap-1.5"
-                  >
-                    Authenticate Principal Desk <ArrowRight className="w-4 h-4" />
-                  </button>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* GATEWAY 3: SUPER ADMIN */}
-          {portalTab === "SUPER_ADMIN" && (
-            <div className="space-y-4">
-              <div>
-                <span className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">
-                  PLATFORM OWNER GATEWAY
-                </span>
-                <h2 className="text-xl font-extrabold text-slate-900 mt-1">SuperAdmin Console</h2>
-                <p className="text-xs text-slate-500">Create institutes, issue cryptographic keys, and manage tenants.</p>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">Master Email</label>
-                <input
-                  type="email"
-                  value={superAdminEmail}
-                  onChange={(e) => setSuperAdminEmail(e.target.value)}
-                  placeholder="hiteshhkumar.agrawal@gmail.com"
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-amber-500 font-medium"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">Master PIN</label>
-                <input
-                  type="password"
-                  value={superAdminPin}
-                  onChange={(e) => setSuperAdminPin(e.target.value)}
-                  placeholder="Master PIN: 9637"
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-slate-900 outline-none focus:ring-2 focus:ring-amber-500"
-                />
-              </div>
-
-              {authError && (
-                <div className="p-2.5 rounded-lg bg-red-50 text-red-700 text-xs font-semibold flex items-center gap-1.5">
-                  <ShieldAlert className="w-4 h-4" /> {authError}
-                </div>
-              )}
-
-              <button
-                onClick={handleSuperAdminLogin}
-                className="w-full bg-slate-900 hover:bg-black text-white font-extrabold text-xs py-3 rounded-xl shadow-lg transition flex items-center justify-center gap-1.5"
-              >
-                Access Master Provisioner <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-          )}
-        </main>
-
-        <footer className="text-center text-xs text-slate-500">
-          Office AI Genie™ • Statutory Multi-Tenant Operating System
-        </footer>
-      </div>
-    );
-  }
-
-  // =========================================================================
-  // VIEW 2: SUPER ADMIN WORKSPACE (PROVISION INSTITUTES & KEYS)
-  // =========================================================================
-  if (isSuperAdminSession) {
-    return (
-      <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-sans">
-        <header className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="font-mono text-xs px-2.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold border border-amber-500/30">
-              PLATFORM OWNER
-            </span>
-            <h1 className="font-extrabold text-sm uppercase">Global Tenant & License Key Generator</h1>
-          </div>
-          <button
-            onClick={handleLogout}
-            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold flex items-center gap-1.5"
-          >
-            <LogOut className="w-3.5 h-3.5" /> Sign Out
-          </button>
-        </header>
-
-        <main className="max-w-6xl w-full mx-auto p-6 space-y-6 flex-1">
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
-            <div className="flex items-center gap-2 mb-1">
-              <Building className="w-5 h-5 text-blue-600" />
-              <h2 className="text-base font-extrabold text-slate-900">Provision New College & Generate License Key</h2>
-            </div>
-            <p className="text-xs text-slate-500 mb-4">
-              Provisioning registers the institute, issues a cryptographic license key, and activates the Principal Admin account.
-            </p>
-
-            {generatedKeyNotice && (
-              <div className="mb-5 p-4 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-950 text-xs">
-                <div className="font-bold flex items-center gap-1.5 text-emerald-800">
-                  <BadgeCheck className="w-4 h-4 text-emerald-600" /> College Provisioned & License Issued!
-                </div>
-                <div className="mt-2 font-mono font-bold text-sm bg-white px-3 py-2 rounded-lg border border-emerald-300 inline-block text-slate-900">
-                  {generatedKeyNotice.key}
-                </div>
-                <div className="mt-2 text-[11px] text-emerald-800">
-                  Principal Account: <strong>{generatedKeyNotice.email}</strong> (Default PIN: <code>1234</code>)
-                </div>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">College Legal Name *</label>
-                <input
-                  type="text"
-                  value={newInstName}
-                  onChange={(e) => setNewInstName(e.target.value)}
-                  placeholder="e.g. D. P. Kharde Navjeevan College of Pharmacy"
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-medium"
-                />
-              </div>
-
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Governing Society / Trust</label>
-                <input
-                  type="text"
-                  value={newTrustName}
-                  onChange={(e) => setNewTrustName(e.target.value)}
-                  placeholder="e.g. Navjeevan Education Society"
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2"
-                />
-              </div>
-
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Location / District</label>
-                <input
-                  type="text"
-                  value={newLocation}
-                  onChange={(e) => setNewLocation(e.target.value)}
-                  placeholder="e.g. Sinnar, Nashik"
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2"
-                />
-              </div>
-
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Principal Name</label>
-                <input
-                  type="text"
-                  value={newPrincipal}
-                  onChange={(e) => setNewPrincipal(e.target.value)}
-                  placeholder="e.g. Dr. Hiteshkumar Agrawal"
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2"
-                />
-              </div>
-
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Principal Official Email (Login ID) *</label>
-                <input
-                  type="email"
-                  value={newPrincipalEmail}
-                  onChange={(e) => setNewPrincipalEmail(e.target.value)}
-                  placeholder="e.g. principal@dpkcop.org.in"
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-medium"
-                />
-              </div>
-
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">MSBTE Code</label>
-                <input
-                  type="text"
-                  value={newMsbte}
-                  onChange={(e) => setNewMsbte(e.target.value)}
-                  placeholder="62386"
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">DTE Code</label>
-                <input
-                  type="text"
-                  value={newDte}
-                  onChange={(e) => setNewDte(e.target.value)}
-                  placeholder="5539"
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">PCI Code</label>
-                <input
-                  type="text"
-                  value={newPci}
-                  onChange={(e) => setNewPci(e.target.value)}
-                  placeholder="9178"
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">AISHE Code</label>
-                <input
-                  type="text"
-                  value={newAishe}
-                  onChange={(e) => setNewAishe(e.target.value)}
-                  placeholder="S-22693"
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-mono"
-                />
-              </div>
-            </div>
-
-            <button
-              onClick={handleCreateTenant}
-              className="mt-4 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-sm"
-            >
-              <Key className="w-4 h-4" /> Issue Cryptographic Key & Provision Tenant
-            </button>
-          </div>
-
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
-            <h2 className="text-base font-extrabold text-slate-900 mb-3">
-              Provisioned Colleges & Keys ({tenants.length})
-            </h2>
-            {tenants.length === 0 ? (
-              <div className="text-xs text-slate-400 py-6 text-center">
-                Zero colleges provisioned. Use the form above to issue your first license key.
-              </div>
-            ) : (
-              <div className="divide-y divide-slate-100 text-xs">
-                {tenants.map((t) => (
-                  <div key={t.id} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                      <div className="font-extrabold text-slate-900 text-sm">{t.name}</div>
-                      <div className="text-slate-500">{t.location} • Principal: {t.principalName} ({t.principalEmail})</div>
-                      <div className="text-[10px] text-blue-600 font-mono mt-0.5">
-                        MSBTE: {t.msbteCode || "-"} | DTE: {t.dteCode || "-"} | PCI: {t.pciCode || "-"} | AISHE: {t.aisheCode || "-"}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-[10px] text-slate-400 font-bold uppercase">Issued License Key</div>
-                      <code className="text-xs font-bold text-slate-900 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200 inline-block font-mono mt-0.5">
-                        {t.licenseKey}
-                      </code>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </main>
-      </div>
-    );
-  }
-
-  // =========================================================================
-  // VIEW 3: DESK WORKSPACE (PRINCIPAL & DELEGATED OFFICERS)
-  // =========================================================================
-  const isPrincipal = sessionUser.role === "INSTITUTE_ADMIN";
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
-      {/* Top Header */}
-      <header className="border-b border-slate-200 bg-white sticky top-0 z-40 px-6 py-3 shadow-xs">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-white border border-slate-200 p-1 flex items-center justify-center">
-              <img 
-                src="https://raw.githubusercontent.com/agrawalhiteshhkumar/faculty-ai-genie/main/brightpath-logo.png" 
-                alt="Logo" 
-                className="h-full w-full object-contain"
-              />
-            </div>
-            <div>
-              <div className="font-black text-sm text-slate-900">{sessionTenant?.name}</div>
-              <div className="text-[10px] font-mono text-slate-500">
-                MSBTE: {sessionTenant?.msbteCode || "N/A"} • DTE: {sessionTenant?.dteCode || "N/A"} • PCI: {sessionTenant?.pciCode || "N/A"}
-              </div>
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-blue-600 selection:text-white">
+      {/* --- TOP BRANDING BAR --- */}
+      <header className="border-b border-slate-800 bg-slate-900/60 backdrop-blur-md px-6 py-3.5 flex items-center justify-between sticky top-0 z-40">
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-blue-700 via-indigo-600 to-sky-400 p-0.5 shadow-md shadow-blue-900/20">
+            <div className="h-full w-full bg-slate-950 rounded-[10px] flex items-center justify-center">
+              <Building2 className="w-5 h-5 text-blue-400" />
             </div>
           </div>
-
-          <div className="flex items-center gap-3">
-            <div className="text-right hidden sm:block text-xs">
-              <div className="font-bold text-slate-900">{sessionUser.name}</div>
-              <div className="text-[10px] text-blue-600 font-semibold">{sessionUser.designationTitle}</div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold text-white tracking-tight text-base font-serif">OFFICE AI GENIE™</span>
+              <span className="text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                Institutional OS
+              </span>
             </div>
-            <button
-              onClick={handleLogout}
-              className="px-3 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold flex items-center gap-1.5 transition border border-red-200"
-            >
-              <LogOut className="w-3.5 h-3.5" /> Sign Out
-            </button>
+            <p className="text-[11px] text-slate-400">Maharashtra Statutory Administration Engine (MSBTE • PCI • DTE • FFC)</p>
           </div>
         </div>
 
-        {/* Operational Desk Navigation */}
-        <div className="mt-3 pt-3 border-t border-slate-100 flex items-center flex-wrap gap-2 text-xs">
-          <button
-            onClick={() => setActiveDesk("OVERVIEW")}
-            className={`px-3 py-1.5 rounded-lg font-bold transition ${
-              activeDesk === "OVERVIEW" ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-            }`}
-          >
-            Dashboard
-          </button>
-
-          {isPrincipal && (
-            <button
-              onClick={() => setActiveDesk("ROLE_MANAGEMENT")}
-              className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 ${
-                activeDesk === "ROLE_MANAGEMENT" ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >
-              <Users className="w-3.5 h-3.5" /> Delegate Officer Roles
-            </button>
-          )}
-
-          {(sessionUser.allowedDesks.includes("ALL") || sessionUser.allowedDesks.includes("ESTABLISHMENT")) && (
-            <button
-              onClick={() => setActiveDesk("ESTABLISHMENT")}
-              className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 ${
-                activeDesk === "ESTABLISHMENT" ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >
-              <Users className="w-3.5 h-3.5 text-indigo-600" /> PCI Cadre Roster
-            </button>
-          )}
-
-          {(sessionUser.allowedDesks.includes("ALL") || sessionUser.allowedDesks.includes("EXAM_CELL")) && (
-            <button
-              onClick={() => setActiveDesk("EXAM_CELL")}
-              className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 ${
-                activeDesk === "EXAM_CELL" ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >
-              <GraduationCap className="w-3.5 h-3.5" /> MSBTE Exam Cell
-            </button>
-          )}
-
-          {(sessionUser.allowedDesks.includes("ALL") || sessionUser.allowedDesks.includes("ACCOUNTS")) && (
-            <button
-              onClick={() => setActiveDesk("ACCOUNTS")}
-              className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 ${
-                activeDesk === "ACCOUNTS" ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >
-              <IndianRupee className="w-3.5 h-3.5" /> FFC & FRA Accounts
-            </button>
-          )}
-
-          {(sessionUser.allowedDesks.includes("ALL") || sessionUser.allowedDesks.includes("PHARMACY_STORES")) && (
-            <button
-              onClick={() => setActiveDesk("PHARMACY_STORES")}
-              className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 ${
-                activeDesk === "PHARMACY_STORES" ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >
-              <Boxes className="w-3.5 h-3.5" /> Stores & Dead Stock
-            </button>
-          )}
-
-          {(sessionUser.allowedDesks.includes("ALL") || sessionUser.allowedDesks.includes("STUDENT_ADMISSIONS")) && (
-            <button
-              onClick={() => setActiveDesk("STUDENT_ADMISSIONS")}
-              className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 ${
-                activeDesk === "STUDENT_ADMISSIONS" ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >
-              <UserCheck className="w-3.5 h-3.5" /> Admissions & MahaDBT
-            </button>
-          )}
-        </div>
-      </header>
-
-      {/* Main Workspace Body */}
-      <main className="p-6 max-w-6xl w-full mx-auto space-y-6 flex-1">
-        {/* VIEW A: ROLE DELEGATION (PRINCIPAL ONLY) */}
-        {activeDesk === "ROLE_MANAGEMENT" && isPrincipal && (
-          <div className="space-y-6">
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
-              <div className="flex items-center gap-2 mb-1">
-                <Users className="w-5 h-5 text-blue-600" />
-                <h2 className="text-base font-extrabold text-slate-900">Create Staff / Desk Officer Account</h2>
+        {activeTab === 'PORTAL' && currentTenant && (
+          <div className="flex items-center gap-4">
+            <div className="text-right hidden md:block">
+              <div className="text-xs font-bold text-slate-200">{currentTenant.name}</div>
+              <div className="text-[10px] font-mono text-slate-400 flex items-center justify-end gap-2">
+                <span>MSBTE: {currentTenant.msbteCode}</span>
+                <span>•</span>
+                <span>PCI: {currentTenant.pciCode}</span>
+                <span>•</span>
+                <span>DTE: {currentTenant.dteCode}</span>
               </div>
-              <p className="text-xs text-slate-500 mb-4">
-                Assign specific departmental roles to your faculty and staff. They will sign in using the <strong>Desk Officer</strong> login tab.
-              </p>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">Officer Name *</label>
-                  <input
-                    type="text"
-                    value={newStaffName}
-                    onChange={(e) => setNewStaffName(e.target.value)}
-                    placeholder="e.g. Prof. S. R. Deshmukh"
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-medium"
-                  />
+            </div>
+            <div className="h-8 w-px bg-slate-800 hidden md:block" />
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                <div className="text-xs font-bold text-white flex items-center gap-1.5 justify-end">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  {currentUser?.name}
                 </div>
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">Official Email *</label>
-                  <input
-                    type="email"
-                    value={newStaffEmail}
-                    onChange={(e) => setNewStaffEmail(e.target.value)}
-                    placeholder="e.g. exam@college.edu"
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-medium"
-                  />
-                </div>
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">Designation Title</label>
-                  <input
-                    type="text"
-                    value={newStaffDesignation}
-                    onChange={(e) => setNewStaffDesignation(e.target.value)}
-                    placeholder="e.g. MSBTE Exam Officer"
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2"
-                  />
-                </div>
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">Delegated Desk</label>
-                  <select
-                    value={selectedDeskScope}
-                    onChange={(e) => setSelectedDeskScope(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-bold"
-                  >
-                    <option value="EXAM_CELL">MSBTE Exam Cell</option>
-                    <option value="ESTABLISHMENT">PCI Cadre Roster</option>
-                    <option value="ACCOUNTS">FFC/FRA Accounts</option>
-                    <option value="PHARMACY_STORES">Stores & Solvents</option>
-                    <option value="STUDENT_ADMISSIONS">Admissions & MahaDBT</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">Assign Access PIN *</label>
-                  <input
-                    type="password"
-                    value={newStaffPin}
-                    onChange={(e) => setNewStaffPin(e.target.value)}
-                    placeholder="e.g. 5678"
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-mono font-bold"
-                  />
-                </div>
+                <div className="text-[10px] text-blue-400 font-medium">{currentUser?.role}</div>
               </div>
-
-              <button
-                onClick={handleCreateRole}
-                className="mt-4 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 transition"
+              <button 
+                onClick={handleLogout}
+                className="p-2 rounded-lg bg-slate-800/80 hover:bg-red-500/20 hover:text-red-400 text-slate-400 border border-slate-700/80 transition cursor-pointer"
+                title="Sign Out"
               >
-                <PlusCircle className="w-4 h-4" /> Issue Officer Account
+                <LogOut className="w-4 h-4" />
               </button>
-            </div>
-
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
-              <h3 className="text-sm font-extrabold text-slate-900 mb-3">
-                Active Staff & Desk Officers for {sessionTenant?.name}
-              </h3>
-              {users.filter((u) => u.instituteId === sessionTenant?.id && u.role === "OFFICER_DESK").length === 0 ? (
-                <div className="text-xs text-slate-400 py-6 text-center">
-                  Zero officer accounts created yet. Use the form above to add your first desk officer.
-                </div>
-              ) : (
-                <div className="divide-y divide-slate-100 text-xs">
-                  {users.filter((u) => u.instituteId === sessionTenant?.id && u.role === "OFFICER_DESK").map((u) => (
-                    <div key={u.id} className="py-2.5 flex items-center justify-between">
-                      <div>
-                        <span className="font-bold text-slate-900">{u.name}</span>
-                        <span className="text-slate-400 ml-2">({u.email})</span>
-                        <div className="text-[11px] text-blue-600 font-medium">{u.designationTitle}</div>
-                      </div>
-                      <span className="font-mono text-[10px] bg-slate-100 px-2.5 py-0.5 rounded border border-slate-200 font-bold">
-                        Scope: {u.allowedDesks.join(", ")}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
         )}
 
-        {/* VIEW B: ACTIVE STATUTORY DESK WITH PRINT ENGINE RE-LINKED */}
-        {activeDesk !== "OVERVIEW" && activeDesk !== "ROLE_MANAGEMENT" && (
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
-              <div>
-                <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">
-                  LIVE STATUTORY DESK
-                </span>
-                <h2 className="text-lg font-extrabold text-slate-900">
-                  {activeDesk === "EXAM_CELL" && "MSBTE Examination Cell"}
-                  {activeDesk === "ESTABLISHMENT" && "PCI Teaching Cadre & Approvals"}
-                  {activeDesk === "ACCOUNTS" && "Fees Regulating Committee (FFC / FRA) Accounts"}
-                  {activeDesk === "PHARMACY_STORES" && "Pharmacy Stores & Hazardous Solvents"}
-                  {activeDesk === "STUDENT_ADMISSIONS" && "DTE CAP Admissions & MahaDBT"}
-                </h2>
-                <p className="text-xs text-slate-500">Official live statutory register and verified PDF report generation engine.</p>
+        {activeTab === 'SUPERADMIN' && (
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-bold text-amber-400 bg-amber-400/10 border border-amber-400/20 px-2.5 py-1 rounded-md flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5" /> Platform Architect Mode
+            </span>
+            <button 
+              onClick={handleLogout}
+              className="p-2 rounded-lg bg-slate-800 hover:bg-red-500/20 hover:text-red-400 text-slate-400 border border-slate-700 transition cursor-pointer"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+      </header>
+
+      {/* --- MAIN BODY CONTENT --- */}
+      <main className="flex-1 flex flex-col p-4 md:p-8 max-w-7xl w-full mx-auto">
+        
+        {/* VIEW 1: AUTHENTICATION GATEWAY */}
+        {activeTab === 'LOGIN' && (
+          <div className="flex-1 flex flex-col items-center justify-center py-6">
+            
+            {/* SIGNATORY & ARCHITECT EXECUTIVE BADGE */}
+            <div className="w-full max-w-xl bg-slate-900/90 border border-slate-800 rounded-2xl p-5 mb-6 shadow-xl backdrop-blur-md">
+              <div className="flex items-center justify-between border-b border-slate-800/80 pb-3 mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-11 w-11 rounded-xl bg-blue-600 flex items-center justify-center font-bold text-white text-base shadow-inner">
+                    HA
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-extrabold text-white text-base tracking-tight">Dr. Hiteshkumar Agrawal</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                        <BadgeCheck className="w-3 h-3 text-emerald-400" /> Signatory Verified
+                      </span>
+                    </div>
+                    <div className="text-xs text-slate-400 font-medium">Founder &amp; Chief Academic Architect, Office AI Genie™</div>
+                    <div className="text-[11px] text-slate-500">Principal, D. P. Kharde Navjeevan College of Pharmacy, Sinnar</div>
+                  </div>
+                </div>
               </div>
-
-              {/* Integrated Statutory Print & Export Launchers */}
-              <div className="flex items-center gap-2">
-                {activeDesk === "EXAM_CELL" && (
-                  <button
-                    onClick={() => setIsExamModalOpen(true)}
-                    className="px-3.5 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-sm"
-                  >
-                    <Printer className="w-3.5 h-3.5" /> Launch MSBTE Exam & Print Engine
-                  </button>
-                )}
-
-                {activeDesk === "ESTABLISHMENT" && (
-                  <button
-                    onClick={() => setIsCadreModalOpen(true)}
-                    className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-sm"
-                  >
-                    <Printer className="w-3.5 h-3.5" /> Launch PCI Cadre Matrix & PDF
-                  </button>
-                )}
-
-                {activeDesk === "ACCOUNTS" && (
-                  <button
-                    onClick={() => setIsFRAModalOpen(true)}
-                    className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-sm"
-                  >
-                    <Printer className="w-3.5 h-3.5" /> Launch FFC/FRA Fee Proposal Engine
-                  </button>
-                )}
-
-                {activeDesk === "PHARMACY_STORES" && (
-                  <button
-                    onClick={() => setIsStoresModalOpen(true)}
-                    className="px-3.5 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-sm"
-                  >
-                    <Printer className="w-3.5 h-3.5" /> Launch SIF-E Stores & Solvents Matrix
-                  </button>
-                )}
-
-                {activeDesk === "STUDENT_ADMISSIONS" && (
-                  <button
-                    onClick={() => setIsAdmissionsModalOpen(true)}
-                    className="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-sm"
-                  >
-                    <Printer className="w-3.5 h-3.5" /> Launch DTE CAP & MahaDBT Matrix
-                  </button>
-                )}
-
-                <button
-                  onClick={() => setShowAddEntryModal(true)}
-                  className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 transition"
-                >
-                  <PlusCircle className="w-3.5 h-3.5" /> Add Manual Entry
-                </button>
+              <div className="flex flex-wrap items-center justify-between text-xs text-slate-400 gap-2 font-mono">
+                <div className="flex items-center gap-1.5">
+                  <Mail className="w-3.5 h-3.5 text-blue-400" />
+                  <a href="mailto:hiteshhkumar.agrawal@gmail.com" className="hover:text-blue-300">hiteshhkumar.agrawal@gmail.com</a>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Phone className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>+91 9637521852</span>
+                </div>
               </div>
             </div>
 
-            {/* Desk Records List */}
-            {deskRecords.filter(r => r.desk === activeDesk).length === 0 ? (
-              <div className="py-16 text-center border-2 border-dashed border-slate-200 rounded-xl">
-                <FileText className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                <div className="text-xs font-bold text-slate-700">No Records Found in {activeDesk}</div>
-                <div className="text-[11px] text-slate-400 mt-0.5">
-                  Launch the official print engine above or click "Add Manual Entry" to log your first verified entry.
+            {/* LOGIN CARD */}
+            <div className="w-full max-w-xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+              <div className="border-b border-slate-800 bg-slate-900/50 p-1 flex">
+                <button
+                  onClick={() => setLoginRole('STAFF')}
+                  className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition cursor-pointer ${loginRole === 'STAFF' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                >
+                  Desk Officer
+                </button>
+                <button
+                  onClick={() => setLoginRole('PRINCIPAL')}
+                  className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition cursor-pointer ${loginRole === 'PRINCIPAL' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                >
+                  Principal Admin
+                </button>
+                <button
+                  onClick={() => setLoginRole('SUPERADMIN')}
+                  className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition cursor-pointer ${loginRole === 'SUPERADMIN' ? 'bg-amber-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                >
+                  SuperAdmin
+                </button>
+              </div>
+
+              <div className="p-6 md:p-8">
+                {loginRole === 'STAFF' && (
+                  <form onSubmit={handleStaffLogin} className="space-y-4">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-blue-400">Delegated Officer Desk</span>
+                      <h2 className="text-xl font-extrabold text-white mt-0.5">Staff &amp; Faculty Desk Login</h2>
+                      <p className="text-xs text-slate-400 mt-1">Sign in with credentials assigned by your Principal.</p>
+                    </div>
+
+                    <div className="space-y-3 pt-2">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">Official Desk Email</label>
+                        <input
+                          type="email"
+                          required
+                          value={staffEmailInput}
+                          onChange={(e) => setStaffEmailInput(e.target.value)}
+                          placeholder="e.g. exam@dpkcop.edu"
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">Desk Access PIN</label>
+                        <input
+                          type="password"
+                          required
+                          value={staffPinInput}
+                          onChange={(e) => setStaffPinInput(e.target.value)}
+                          placeholder="••••"
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full mt-4 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-3 rounded-xl transition shadow-lg shadow-blue-600/20 cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      Authenticate Desk Access &rarr;
+                    </button>
+
+                    <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800 text-[11px] text-slate-400">
+                      <span className="font-bold text-slate-300 block mb-1">Demo Quick Logins (PIN: 1234):</span>
+                      <div className="grid grid-cols-2 gap-1 font-mono text-[10px]">
+                        <span className="text-blue-400 hover:underline cursor-pointer" onClick={() => { setStaffEmailInput('exam@dpkcop.edu'); setStaffPinInput('1234'); }}>exam@dpkcop.edu</span>
+                        <span className="text-blue-400 hover:underline cursor-pointer" onClick={() => { setStaffEmailInput('accounts@dpkcop.edu'); setStaffPinInput('1234'); }}>accounts@dpkcop.edu</span>
+                        <span className="text-blue-400 hover:underline cursor-pointer" onClick={() => { setStaffEmailInput('estab@dpkcop.edu'); setStaffPinInput('1234'); }}>estab@dpkcop.edu</span>
+                        <span className="text-blue-400 hover:underline cursor-pointer" onClick={() => { setStaffEmailInput('admission@dpkcop.edu'); setStaffPinInput('1234'); }}>admission@dpkcop.edu</span>
+                      </div>
+                    </div>
+                  </form>
+                )}
+
+                {loginRole === 'PRINCIPAL' && (
+                  <form onSubmit={handlePrincipalLogin} className="space-y-4">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-400">Executive Authority</span>
+                      <h2 className="text-xl font-extrabold text-white mt-0.5">Principal Administrator Login</h2>
+                      <p className="text-xs text-slate-400 mt-1">Full statutory jurisdiction over MSBTE, PCI, DTE &amp; FFC portals.</p>
+                    </div>
+
+                    <div className="space-y-3 pt-2">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">Principal Official Email</label>
+                        <input
+                          type="email"
+                          required
+                          value={principalEmailInput}
+                          onChange={(e) => setPrincipalEmailInput(e.target.value)}
+                          placeholder="hiteshhkumar.agrawal@gmail.com"
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">Institutional Cryptographic Key / PIN</label>
+                        <input
+                          type="password"
+                          required
+                          value={principalKeyInput}
+                          onChange={(e) => setPrincipalKeyInput(e.target.value)}
+                          placeholder="BP-KEY-... or PIN: 1234"
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full mt-4 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold py-3 rounded-xl transition shadow-lg shadow-emerald-600/20 cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      Enter Executive Command &rarr;
+                    </button>
+
+                    <div className="text-[11px] text-slate-500 text-center">
+                      Need a license key? Access the SuperAdmin tab to provision your college.
+                    </div>
+                  </form>
+                )}
+
+                {loginRole === 'SUPERADMIN' && (
+                  <form onSubmit={handleSuperAdminLogin} className="space-y-4">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-amber-400">Platform Owner Gateway</span>
+                      <h2 className="text-xl font-extrabold text-white mt-0.5">SuperAdmin Console</h2>
+                      <p className="text-xs text-slate-400 mt-1">Create institutes, issue cryptographic keys, and manage tenants.</p>
+                    </div>
+
+                    <div className="space-y-3 pt-2">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">Master Email</label>
+                        <input
+                          type="email"
+                          required
+                          value={superAdminEmail}
+                          onChange={(e) => setSuperAdminEmail(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">Master PIN</label>
+                        <input
+                          type="password"
+                          required
+                          value={superAdminPin}
+                          onChange={(e) => setSuperAdminPin(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500 font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full mt-4 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold py-3 rounded-xl transition shadow-lg shadow-amber-600/20 cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      Access Master Provisioner &rarr;
+                    </button>
+                  </form>
+                )}
+              </div>
+            </div>
+            
+            <p className="text-[11px] text-slate-600 mt-6 font-mono text-center">
+              Office AI Genie™ • Statutory Multi-Tenant Operating System • v2026.4
+            </p>
+          </div>
+        )}
+
+        {/* VIEW 2: STATUTORY PORTAL (DESKS) */}
+        {activeTab === 'PORTAL' && currentTenant && (
+          <div className="space-y-6">
+            
+            {/* STATUTORY JURISDICTION BAR */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div>
+                <span className="text-[10px] uppercase font-bold tracking-wider text-blue-400 bg-blue-500/10 px-2.5 py-0.5 rounded border border-blue-500/20">
+                  Autonomous Statutory Jurisdiction
+                </span>
+                <h1 className="text-xl font-extrabold text-white mt-1.5">{currentTenant.name}</h1>
+                <p className="text-xs text-slate-400 mt-0.5 font-medium">{currentTenant.society} • {currentTenant.location}</p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-center">
+                  <div className="text-[9px] text-slate-500 uppercase font-mono">MSBTE Code</div>
+                  <div className="text-xs font-bold font-mono text-blue-400">{currentTenant.msbteCode}</div>
+                </div>
+                <div className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-center">
+                  <div className="text-[9px] text-slate-500 uppercase font-mono">DTE Code</div>
+                  <div className="text-xs font-bold font-mono text-emerald-400">{currentTenant.dteCode}</div>
+                </div>
+                <div className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-center">
+                  <div className="text-[9px] text-slate-500 uppercase font-mono">PCI Code</div>
+                  <div className="text-xs font-bold font-mono text-purple-400">{currentTenant.pciCode}</div>
+                </div>
+                <div className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-center">
+                  <div className="text-[9px] text-slate-500 uppercase font-mono">AISHE ID</div>
+                  <div className="text-xs font-bold font-mono text-amber-400">{currentTenant.aisheCode}</div>
                 </div>
               </div>
-            ) : (
+            </div>
+
+            {/* 5 STATUTORY DESK TILES */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              
+              {/* DESK 1: MSBTE EXAM CELL */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 hover:border-blue-500/50 transition flex flex-col justify-between group">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="p-2.5 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                      <FileText className="w-5 h-5" />
+                    </span>
+                    <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400">
+                      CIAAN-2023 Verified
+                    </span>
+                  </div>
+                  <h3 className="text-base font-extrabold text-white mt-4 group-hover:text-blue-400 transition">
+                    MSBTE Examination Cell
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                    Continuous internal evaluation, sessional marks entry, detention thresholds &amp; MSBTE hall ticket eligibility clearance.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveModal('EXAM_CELL')}
+                  className="mt-5 w-full bg-slate-800 hover:bg-blue-600 text-white text-xs font-bold py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  Open Exam Cell Desk <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* DESK 2: PCI CADRE ROSTER */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 hover:border-indigo-500/50 transition flex flex-col justify-between group">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                      <Users className="w-5 h-5" />
+                    </span>
+                    <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded bg-purple-500/10 text-purple-400">
+                      1:20 Ratio
+                    </span>
+                  </div>
+                  <h3 className="text-base font-extrabold text-white mt-4 group-hover:text-indigo-400 transition">
+                    PCI Cadre &amp; Service Roster
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                    Faculty cadre hierarchy, qualification verification, SIF-B compliance, and DTE government approval matrices.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveModal('CADRE_ROSTER')}
+                  className="mt-5 w-full bg-slate-800 hover:bg-indigo-600 text-white text-xs font-bold py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  Open Cadre Desk <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* DESK 3: FFC / FRA ACCOUNTS */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 hover:border-emerald-500/50 transition flex flex-col justify-between group">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      <Building2 className="w-5 h-5" />
+                    </span>
+                    <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400">
+                      Act 2015 Compliant
+                    </span>
+                  </div>
+                  <h3 className="text-base font-extrabold text-white mt-4 group-hover:text-emerald-400 transition">
+                    FFC / FRA Fee Proposal Wing
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                    Schedule-A calculations, salary vs non-salary breakdowns, inflation multipliers, and annual statutory fee proposals.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveModal('FRA_FEE')}
+                  className="mt-5 w-full bg-slate-800 hover:bg-emerald-600 text-white text-xs font-bold py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  Open Accounts Desk <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* DESK 4: STORES & DEAD STOCK */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 hover:border-amber-500/50 transition flex flex-col justify-between group">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                      <Layers className="w-5 h-5" />
+                    </span>
+                    <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400">
+                      SIF-E Appendix
+                    </span>
+                  </div>
+                  <h3 className="text-base font-extrabold text-white mt-4 group-hover:text-amber-400 transition">
+                    Stores &amp; Dead Stock Registry
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                    Central stores asset ledger, laboratory equipment allocations, purchase verification, and calibration logs.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveModal('STORES')}
+                  className="mt-5 w-full bg-slate-800 hover:bg-amber-600 text-white text-xs font-bold py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  Open Stores Desk <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* DESK 5: DTE ADMISSIONS & MAHADBT */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 hover:border-sky-500/50 transition flex flex-col justify-between group">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="p-2.5 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                      <ShieldCheck className="w-5 h-5" />
+                    </span>
+                    <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded bg-sky-500/10 text-sky-400">
+                      CAP Code: {currentTenant.dteCode}
+                    </span>
+                  </div>
+                  <h3 className="text-base font-extrabold text-white mt-4 group-hover:text-sky-400 transition">
+                    DTE Admissions &amp; Eligibility
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                    CAP seat allocation matrix, category-wise quotas (OPEN, OBC, SC, ST, EWS), MahaDBT scholarship tracking &amp; rollcall.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveModal('ADMISSIONS')}
+                  className="mt-5 w-full bg-slate-800 hover:bg-sky-600 text-white text-xs font-bold py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  Open Admissions Desk <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* AUDIT SUMMARY CARD */}
+              <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between">
+                <div>
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Cryptographic Governance</span>
+                  <h3 className="text-base font-extrabold text-white mt-2">Tamper-Proof Audit Trail</h3>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Every statutory action is hashed and recorded with IST timestamp for regulatory inspection.
+                  </p>
+                  <div className="mt-4 flex items-center gap-2 text-xs font-mono text-emerald-400">
+                    <CheckCircle2 className="w-4 h-4" /> {auditLogs.length} Events Verified
+                  </div>
+                </div>
+                <div className="text-[10px] font-mono text-slate-500 mt-4 truncate">
+                  Latest Block: {auditLogs[0]?.hash || '0x49f82...INIT'}
+                </div>
+              </div>
+            </div>
+
+            {/* AUDIT LOG TABLE */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+                <div>
+                  <h3 className="text-sm font-extrabold text-white">Live Institutional Audit Ledger</h3>
+                  <p className="text-[11px] text-slate-400">Real-time ledger recording administrative and statutory print exports.</p>
+                </div>
+              </div>
+
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-slate-200 text-slate-400 font-semibold uppercase text-[10px]">
-                      <th className="pb-2">Record ID</th>
-                      <th className="pb-2">Primary Title / Item</th>
-                      <th className="pb-2">Category / Spec</th>
-                      <th className="pb-2">Reference / Amount</th>
-                      <th className="pb-2">Logged By</th>
-                      <th className="pb-2 text-right">Timestamp</th>
+                    <tr className="border-b border-slate-800 text-slate-400 uppercase text-[10px] font-bold">
+                      <th className="pb-2.5">Time (IST)</th>
+                      <th className="pb-2.5">Authorized Actor</th>
+                      <th className="pb-2.5">Statutory Action</th>
+                      <th className="pb-2.5">Operational Details</th>
+                      <th className="pb-2.5 text-right font-mono">Verification Hash</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {deskRecords.filter(r => r.desk === activeDesk).map((r) => (
-                      <tr key={r.id} className="text-slate-700">
-                        <td className="py-2.5 font-mono font-bold text-slate-900">{r.id}</td>
-                        <td className="py-2.5 font-semibold text-slate-900">{r.field1}</td>
-                        <td className="py-2.5 text-slate-600">{r.field2 || "-"}</td>
-                        <td className="py-2.5 text-slate-600 font-mono">{r.field3 || "-"}</td>
-                        <td className="py-2.5 text-blue-600 font-medium">{r.officer}</td>
-                        <td className="py-2.5 text-slate-400 text-right">{r.createdAt}</td>
+                  <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
+                    {auditLogs.slice(0, 8).map((log) => (
+                      <tr key={log.id} className="hover:bg-slate-800/30">
+                        <td className="py-2.5 text-slate-400 whitespace-nowrap">{log.timestamp}</td>
+                        <td className="py-2.5 text-slate-200 font-sans font-bold">{log.actor}</td>
+                        <td className="py-2.5 text-blue-400">{log.action}</td>
+                        <td className="py-2.5 text-slate-300 font-sans">{log.details}</td>
+                        <td className="py-2.5 text-right text-emerald-400">{log.hash}</td>
                       </tr>
                     ))}
+                    {auditLogs.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="py-6 text-center text-slate-500 font-sans">
+                          No audit entries recorded yet. Actions generated across the desks will log here automatically.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
-            )}
+            </div>
           </div>
         )}
 
-        {/* VIEW C: OVERVIEW & LEDGER */}
-        {activeDesk === "OVERVIEW" && (
+        {/* VIEW 3: SUPERADMIN PROVISIONER */}
+        {activeTab === 'SUPERADMIN' && (
           <div className="space-y-6">
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div>
-                <span className="text-[10px] font-bold text-blue-600 uppercase">Institutional Summary</span>
-                <h2 className="text-xl font-black text-slate-900 mt-0.5">{sessionTenant?.name}</h2>
-                <div className="text-xs text-slate-500 mt-1">
-                  Trust: {sessionTenant?.trustName} • Location: {sessionTenant?.location}
-                </div>
-              </div>
-              <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl text-xs font-mono">
-                <div className="text-[10px] text-slate-400 font-sans font-bold uppercase">License Key</div>
-                <div className="font-bold text-slate-800">{sessionTenant?.licenseKey}</div>
-              </div>
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded border border-amber-500/20">
+                Master Provisioner Console
+              </span>
+              <h1 className="text-xl font-extrabold text-white mt-2">Institutional Tenant Provisioning Engine</h1>
+              <p className="text-xs text-slate-400 mt-1">
+                Provision autonomous college tenants and generate 256-bit statutory license keys for Maharashtra institutions.
+              </p>
             </div>
 
-            {/* Audit Trail */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
-                <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                  <History className="w-3.5 h-3.5 text-emerald-600" /> Tamper-Evident Ledger
-                </h3>
-                <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-bold">
-                  Append-Only Chained
-                </span>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              
+              {/* PROVISIONING FORM */}
+              <div className="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+                <h3 className="text-sm font-extrabold text-white mb-4">Provision New College</h3>
+                <form onSubmit={handleProvisionTenant} className="space-y-3">
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-300 mb-1">College Legal Name</label>
+                    <input
+                      type="text"
+                      required
+                      value={newInst.name}
+                      onChange={(e) => setNewInst({ ...newInst, name: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-300 mb-1">Governing Society / Trust</label>
+                    <input
+                      type="text"
+                      required
+                      value={newInst.society}
+                      onChange={(e) => setNewInst({ ...newInst, society: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-300 mb-1">Location / District</label>
+                    <input
+                      type="text"
+                      required
+                      value={newInst.location}
+                      onChange={(e) => setNewInst({ ...newInst, location: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[11px] font-medium text-slate-300 mb-1">MSBTE Code</label>
+                      <input
+                        type="text"
+                        required
+                        value={newInst.msbteCode}
+                        onChange={(e) => setNewInst({ ...newInst, msbteCode: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-medium text-slate-300 mb-1">DTE Code</label>
+                      <input
+                        type="text"
+                        required
+                        value={newInst.dteCode}
+                        onChange={(e) => setNewInst({ ...newInst, dteCode: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[11px] font-medium text-slate-300 mb-1">PCI Code</label>
+                      <input
+                        type="text"
+                        required
+                        value={newInst.pciCode}
+                        onChange={(e) => setNewInst({ ...newInst, pciCode: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-medium text-slate-300 mb-1">AISHE ID</label>
+                      <input
+                        type="text"
+                        required
+                        value={newInst.aisheCode}
+                        onChange={(e) => setNewInst({ ...newInst, aisheCode: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-300 mb-1">Principal Name</label>
+                    <input
+                      type="text"
+                      required
+                      value={newInst.principalName}
+                      onChange={(e) => setNewInst({ ...newInst, principalName: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-300 mb-1">Principal Official Email</label>
+                    <input
+                      type="email"
+                      required
+                      value={newInst.principalEmail}
+                      onChange={(e) => setNewInst({ ...newInst, principalEmail: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full mt-4 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold py-3 rounded-xl transition shadow-lg shadow-amber-600/20 cursor-pointer"
+                  >
+                    Issue Cryptographic Key &amp; Provision Tenant &rarr;
+                  </button>
+                </form>
               </div>
-              {auditLedger.length === 0 ? (
-                <div className="text-xs text-slate-400 py-6 text-center">
-                  Ledger active. Any entries created by desk officers or report printouts will appear here with cryptographic hashes.
-                </div>
-              ) : (
-                <div className="divide-y divide-slate-100 text-xs">
-                  {auditLedger.map((l) => (
-                    <div key={l.id} className="py-2 flex items-center justify-between text-slate-600">
+
+              {/* ACTIVE TENANTS TABLE */}
+              <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+                <h3 className="text-sm font-extrabold text-white mb-4">Provisioned Institutional Tenants ({institutions.length})</h3>
+                <div className="space-y-3">
+                  {institutions.map((inst) => (
+                    <div key={inst.id} className="bg-slate-950 border border-slate-800 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
                       <div>
-                        <span className="font-bold text-slate-800">{l.actor}</span>
-                        <span className="text-slate-400 mx-1.5">•</span>
-                        <span>{l.details}</span>
+                        <div className="font-bold text-white text-xs">{inst.name}</div>
+                        <div className="text-[11px] text-slate-400">{inst.society} • {inst.location}</div>
+                        <div className="text-[10px] font-mono text-slate-500 mt-1">
+                          MSBTE: {inst.msbteCode} • DTE: {inst.dteCode} • PCI: {inst.pciCode}
+                        </div>
                       </div>
-                      <code className="text-[10px] text-emerald-600 font-mono font-bold">{l.hash}</code>
+                      <div className="text-right">
+                        <span className="text-[10px] font-mono font-bold px-2.5 py-1 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 block mb-1">
+                          {inst.licenseKey}
+                        </span>
+                        <div className="text-[10px] text-slate-400">Principal: {inst.principalName}</div>
+                      </div>
                     </div>
                   ))}
+                  {institutions.length === 0 && (
+                    <div className="py-12 text-center text-slate-500 text-xs">
+                      No college tenants provisioned yet. Use the form on the left to create your first tenant.
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           </div>
         )}
       </main>
 
-      {/* Manual Entry Creator Modal */}
-      {showAddEntryModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 max-w-md w-full shadow-2xl">
-            <h3 className="text-sm font-black text-slate-900 mb-1">Add Entry to {activeDesk}</h3>
-            <p className="text-xs text-slate-500 mb-4">Logged directly under {sessionUser.name}</p>
-
-            <div className="space-y-3 text-xs">
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Primary Title / Subject / Name *</label>
-                <input
-                  type="text"
-                  value={entryField1}
-                  onChange={(e) => setEntryField1(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-medium"
-                />
-              </div>
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Specification / Classification / Category</label>
-                <input
-                  type="text"
-                  value={entryField2}
-                  onChange={(e) => setEntryField2(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2"
-                />
-              </div>
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Reference No / Serial / Amount</label>
-                <input
-                  type="text"
-                  value={entryField3}
-                  onChange={(e) => setEntryField3(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-mono"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-2 mt-5">
-              <button
-                onClick={() => setShowAddEntryModal(false)}
-                className="flex-1 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddBlankRecord}
-                className="flex-1 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs"
-              >
-                Save Record
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Statutory PDF / Print Engine Modals */}
+      {/* --- DESK MODALS --- */}
       <ExamCellModal
-        isOpen={isExamModalOpen}
-        onClose={() => setIsExamModalOpen(false)}
-        onLogAudit={handleLogAudit}
+        isOpen={activeModal === 'EXAM_CELL'}
+        onClose={() => setActiveModal(null)}
+        onLogAudit={(action, details) => saveAuditLog(action, details)}
       />
+
       <CadreRosterModal
-        isOpen={isCadreModalOpen}
-        onClose={() => setIsCadreModalOpen(false)}
-        onLogAudit={handleLogAudit}
+        isOpen={activeModal === 'CADRE_ROSTER'}
+        onClose={() => setActiveModal(null)}
+        onLogAudit={(action, details) => saveAuditLog(action, details)}
       />
+
       <FRAModal
-        isOpen={isFRAModalOpen}
-        onClose={() => setIsFRAModalOpen(false)}
-        onLogAudit={handleLogAudit}
+        isOpen={activeModal === 'FRA_FEE'}
+        onClose={() => setActiveModal(null)}
+        onLogAudit={(action, details) => saveAuditLog(action, details)}
       />
+
       <StoresModal
-        isOpen={isStoresModalOpen}
-        onClose={() => setIsStoresModalOpen(false)}
-        onLogAudit={handleLogAudit}
+        isOpen={activeModal === 'STORES'}
+        onClose={() => setActiveModal(null)}
+        onLogAudit={(action, details) => saveAuditLog(action, details)}
       />
+
       <AdmissionsModal
-        isOpen={isAdmissionsModalOpen}
-        onClose={() => setIsAdmissionsModalOpen(false)}
-        onLogAudit={handleLogAudit}
+        isOpen={activeModal === 'ADMISSIONS'}
+        onClose={() => setActiveModal(null)}
+        onLogAudit={(action, details) => saveAuditLog(action, details)}
       />
     </div>
   );
